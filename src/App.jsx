@@ -1,125 +1,144 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import LoginPage from './components/auth/LoginPage';
-import RegisterPage from './components/auth/RegisterPage';
-import EmailVerificationPage from './components/auth/EmailVerificationPage';
-import SetPasswordPage from './components/auth/SetPasswordPage';
-import ForgotPasswordPage from './components/auth/ForgotPasswordPage';
-import Navbar from './components/layout/Navbar';
-import HomePage from './components/pages/HomePage';
-import Dashboard from './components/pages/Dashboard';
-import TrainingSelectionPage from './components/pages/TrainingSelectionPage';
-import LabsPage from './components/pages/LabsPage';
-import LabDetailPage from './components/pages/LabDetailPage';
-import ChallengePage from './components/pages/ChallengePage';
-import CommentsPage from './components/pages/CommentsPage';
-import { useAuth } from './hooks/useAuth';
-import { useLabs } from './hooks/useLabs';
-import './styles/animations.css';
+import React, { useState, useEffect } from "react";
+import {
+  BrowserRouter as Router,
+  useNavigate,
+  useLocation,
+} from "react-router-dom";
+import LoginPage from "./components/auth/LoginPage";
+import RegisterPage from "./components/auth/RegisterPage";
+import EmailVerificationPage from "./components/auth/EmailVerificationPage";
+import SetPasswordPage from "./components/auth/SetPasswordPage";
+import ForgotPasswordPage from "./components/auth/ForgotPasswordPage";
+import Navbar from "./components/layout/Navbar";
+import HomePage from "./components/pages/HomePage";
+import Dashboard from "./components/pages/Dashboard";
+import TrainingSelectionPage from "./components/pages/TrainingSelectionPage";
+import LabsPage from "./components/pages/LabsPage";
+import LabDetailPage from "./components/pages/LabDetailPage";
+import ChallengePage from "./components/pages/ChallengePage";
+import CommentsPage from "./components/pages/CommentsPage";
+import { useAuth } from "./hooks/useAuth";
+import { useLabs } from "./hooks/useLabs";
+import "./styles/animations.css";
 
-// Main App Component with Router
 function AppContent() {
-  const { isLoggedIn, currentUser, handleLogin, handleRegister, handleLogout } = useAuth();
-  const { selectedLabType, setSelectedLabType, selectedLab, selectedChallenge } = useLabs();
+  const { isLoggedIn, currentUser, handleLogin, handleRegister, handleLogout } =
+    useAuth();
+  const {
+    selectedLabType,
+    setSelectedLabType,
+  } = useLabs();
+
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [authMode, setAuthMode] = useState('login');
+  const [authMode, setAuthMode] = useState("login");
   const [pendingUser, setPendingUser] = useState(null);
-  const [verificationEmail, setVerificationEmail] = useState('');
+  const [verificationEmail, setVerificationEmail] = useState("");
 
-  // Sync URL with auth mode
+  // 📍 مراقبة المسار الحالي لتحديد صفحة الأوث
   useEffect(() => {
     const path = location.pathname;
-    if (path === '/register') setAuthMode('register');
-    else if (path === '/verify') setAuthMode('verification');
-    else if (path === '/set-password') setAuthMode('setPassword');
-    else if (path === '/forgot-password') setAuthMode('forgotPassword');
-    else setAuthMode('login');
+    if (path === "/register") setAuthMode("register");
+    else if (path === "/verify") setAuthMode("verification");
+    else if (path === "/set-password") setAuthMode("setPassword");
+    else if (path === "/forgot-password") setAuthMode("forgotPassword");
+    else setAuthMode("login");
   }, [location]);
 
-  const handleRegisterStart = (userData) => {
-    setPendingUser(userData);
-    setVerificationEmail(userData.email);
-    navigate('/verify');
+  // 🚀 بدء عملية التسجيل
+  const handleRegisterStart = async (userData) => {
+    try {
+      const response = await fetch("http://localhost/api/register.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(userData),
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        alert("✅ Verification code sent to your email.");
+        setPendingUser(userData);
+        setVerificationEmail(userData.email);
+        navigate("/verify");
+      } else {
+        alert(data.message || "❌ Registration failed.");
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      alert("⚠️ Error connecting to server.");
+    }
   };
 
+  // ✅ بعد التحقق من الكود
   const handleVerificationComplete = () => {
-    navigate('/set-password');
+    navigate("/set-password");
   };
 
+  // 🔁 إعادة إرسال كود التحقق
   const handleResendCode = () => {
-    console.log('Resending verification code to:', verificationEmail);
+    alert("📧 Verification code re-sent to " + verificationEmail);
   };
 
-  const handlePasswordSet = (password) => {
-    console.log('Password set for user:', pendingUser);
+  // 🔐 بعد تعيين الباسورد
+  const handlePasswordSet = async (password) => {
     const completeUser = {
       ...pendingUser,
-      password: password,
-      profile_meta: {
-        ...pendingUser.profile_meta,
-        is_verified: true,
-        verification_date: new Date().toISOString()
-      }
+      password,
     };
-    handleRegister(completeUser);
-    navigate('/');
-    setPendingUser(null);
+
+    try {
+      const response = await fetch("http://localhost/api/set_password.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(completeUser),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        alert("✅ Account created successfully!");
+        handleRegister(completeUser);
+        navigate("/");
+      } else {
+        alert(data.message || "❌ Password setup failed.");
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      alert("⚠️ Error connecting to server.");
+    }
   };
 
-  const handleBackToVerification = () => {
-    navigate('/verify');
-  };
-
-  const handleForgotPassword = () => {
-    navigate('/forgot-password');
-  };
-
-  const handleResetSent = (email) => {
-    console.log('Password reset instructions sent to:', email);
-    setTimeout(() => {
-      navigate('/');
-    }, 3000);
-  };
-
-  const handleBackToLogin = () => {
-    navigate('/');
-  };
-
+  const handleBackToVerification = () => navigate("/verify");
+  const handleForgotPassword = () => navigate("/forgot-password");
+  const handleBackToLogin = () => navigate("/");
   const handleLoginSuccess = (userData) => {
     handleLogin(userData);
-    navigate('/home');
+    navigate("/home");
   };
-
-  const handleNavigation = (page) => {
-    navigate(`/${page}`);
-  };
-
   const handleLogoutWithNavigation = () => {
     handleLogout();
-    navigate('/');
+    navigate("/");
   };
 
-  // Render auth pages based on route
+  // 👇 صفحات الأوث
   const renderAuthPage = () => {
-    switch(authMode) {
-      case 'login':
+    switch (authMode) {
+      case "login":
         return (
-          <LoginPage 
-            onLogin={handleLoginSuccess} 
-            onSwitchToRegister={() => navigate('/register')}
+          <LoginPage
+            onLogin={handleLoginSuccess}
+            onSwitchToRegister={() => navigate("/register")}
             onForgotPassword={handleForgotPassword}
           />
         );
-      case 'register':
+      case "register":
         return (
-          <RegisterPage 
-            onRegister={handleRegisterStart} 
-            onSwitchToLogin={() => navigate('/')} 
+          <RegisterPage
+            onRegister={handleRegisterStart}
+            onSwitchToLogin={() => navigate("/")}
           />
         );
-      case 'verification':
+      case "verification":
         return (
           <EmailVerificationPage
             email={verificationEmail}
@@ -127,7 +146,7 @@ function AppContent() {
             onResendCode={handleResendCode}
           />
         );
-      case 'setPassword':
+      case "setPassword":
         return (
           <SetPasswordPage
             email={verificationEmail}
@@ -135,44 +154,54 @@ function AppContent() {
             onBackToVerification={handleBackToVerification}
           />
         );
-      case 'forgotPassword':
+      case "forgotPassword":
         return (
           <ForgotPasswordPage
             onBackToLogin={handleBackToLogin}
-            onResetSent={handleResetSent}
           />
         );
       default:
         return (
-          <LoginPage 
-            onLogin={handleLoginSuccess} 
-            onSwitchToRegister={() => navigate('/register')}
+          <LoginPage
+            onLogin={handleLoginSuccess}
+            onSwitchToRegister={() => navigate("/register")}
             onForgotPassword={handleForgotPassword}
           />
         );
     }
   };
 
-  // Render main app pages
+  // 👇 صفحات البرنامج الرئيسية
   const renderPage = () => {
     const path = location.pathname;
-    
-    if (path === '/home' || path === '/') {
-      return <HomePage setCurrentPage={handleNavigation} />;
-    } else if (path === '/dashboard') {
-      return <Dashboard />;
-    } else if (path === '/training') {
-      return <TrainingSelectionPage setCurrentPage={handleNavigation} setSelectedLabType={setSelectedLabType} />;
-    } else if (path === '/labs') {
-      return <LabsPage setCurrentPage={handleNavigation} selectedLabType={selectedLabType} />;
-    } else if (path === '/lab-detail') {
-      return <LabDetailPage setCurrentPage={handleNavigation} />;
-    } else if (path === '/challenge') {
-      return <ChallengePage setCurrentPage={handleNavigation} />;
-    } else if (path === '/comments') {
-      return <CommentsPage />;
-    } else {
-      return <HomePage setCurrentPage={handleNavigation} />;
+    switch (path) {
+      case "/home":
+      case "/":
+        return <HomePage setCurrentPage={(p) => navigate(`/${p}`)} />;
+      case "/dashboard":
+        return <Dashboard />;
+      case "/training":
+        return (
+          <TrainingSelectionPage
+            setCurrentPage={(p) => navigate(`/${p}`)}
+            setSelectedLabType={setSelectedLabType}
+          />
+        );
+      case "/labs":
+        return (
+          <LabsPage
+            setCurrentPage={(p) => navigate(`/${p}`)}
+            selectedLabType={selectedLabType}
+          />
+        );
+      case "/lab-detail":
+        return <LabDetailPage setCurrentPage={(p) => navigate(`/${p}`)} />;
+      case "/challenge":
+        return <ChallengePage setCurrentPage={(p) => navigate(`/${p}`)} />;
+      case "/comments":
+        return <CommentsPage />;
+      default:
+        return <HomePage setCurrentPage={(p) => navigate(`/${p}`)} />;
     }
   };
 
@@ -183,9 +212,9 @@ function AppContent() {
       ) : (
         <>
           <Navbar
-            setCurrentPage={handleNavigation}
+            setCurrentPage={(p) => navigate(`/${p}`)}
             onLogout={handleLogoutWithNavigation}
-            currentPage={location.pathname.replace('/', '') || 'home'}
+            currentPage={location.pathname.replace("/", "") || "home"}
             currentUser={currentUser}
           />
           {renderPage()}
@@ -195,13 +224,10 @@ function AppContent() {
   );
 }
 
-// Router Wrapper
-function App() {
+export default function App() {
   return (
     <Router>
       <AppContent />
     </Router>
   );
 }
-
-export default App;

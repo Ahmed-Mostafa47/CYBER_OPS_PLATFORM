@@ -18,38 +18,41 @@ const RegisterPage = ({ onRegister, onSwitchToLogin }) => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    console.log('Registration attempted with:', formData);
-    
     setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      const userData = {
-        user_id: Math.floor(Math.random() * 1000) + 1,
-        username: formData.username,
-        email: formData.email,
-        full_name: formData.fullName,
-        total_points: 0,
-        profile_meta: {
-          avatar: "🆕",
-          rank: "RECRUIT",
-          specialization: "TRAINING",
-          join_date: new Date().toISOString()
-        }
-      };
-      
+    try {
+      // ✅ هنا استبدلنا المسار ليكون ثابت وواضح
+      const response = await fetch("http://localhost/graduatoin%20project/src/components/auth/send_verification.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+      console.log("Server response:", data);
+
+      if (data.success) {
+        alert("✅ Verification code sent to your email.");
+        // ✅ بدلاً من window.location.href
+        // نستخدم الـ prop الجاي من App.jsx عشان نروح لصفحة التحقق
+      window.location.href = `/verify?email=${formData.email}`;
+      } else {
+        alert(data.message || "❌ Registration failed.");
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      alert("⚠️ Error connecting to server.");
+    } finally {
       setIsLoading(false);
-      onRegister(userData);
-    }, 1500);
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center p-4 relative overflow-hidden">
       <BinaryRain />
-      
+
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-500/10 via-gray-900 to-black"></div>
       <div className="absolute top-0 left-0 w-full h-1 bg-blue-400 animate-pulse"></div>
 
@@ -73,7 +76,7 @@ const RegisterPage = ({ onRegister, onSwitchToLogin }) => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Operative Codename */}
+              {/* Username */}
               <div className="relative group">
                 <label className="block text-sm font-semibold text-gray-400 mb-2 font-mono text-left">
                   OPERATIVE_CODENAME
@@ -92,7 +95,7 @@ const RegisterPage = ({ onRegister, onSwitchToLogin }) => {
                 </div>
               </div>
 
-              {/* Communication Channel */}
+              {/* Email */}
               <div className="relative group">
                 <label className="block text-sm font-semibold text-gray-400 mb-2 font-mono text-left">
                   COMMUNICATION_CHANNEL
@@ -111,7 +114,7 @@ const RegisterPage = ({ onRegister, onSwitchToLogin }) => {
                 </div>
               </div>
 
-              {/* Full Identity */}
+              {/* Full name */}
               <div className="relative group">
                 <label className="block text-sm font-semibold text-gray-400 mb-2 font-mono text-left">
                   FULL_IDENTITY
@@ -130,13 +133,12 @@ const RegisterPage = ({ onRegister, onSwitchToLogin }) => {
                 </div>
               </div>
 
-              {/* Info Box */}
+              {/* Info */}
               <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-  <div className="text-blue-300 font-mono text-sm text-center break-words">
-    ENCRYPTION_KEY_WILL_BE_SET_AFTER_IDENTITY_VERIFICATION
-  </div>
-</div>
-
+                <div className="text-blue-300 font-mono text-sm text-center break-words">
+                  ENCRYPTION_KEY_WILL_BE_SET_AFTER_IDENTITY_VERIFICATION
+                </div>
+              </div>
 
               <button
                 type="submit"
@@ -175,9 +177,8 @@ const RegisterPage = ({ onRegister, onSwitchToLogin }) => {
                 <p className="font-semibold text-white text-sm font-mono">SECURE_REGISTRATION</p>
               </div>
               <p className="text-gray-400 text-xs font-mono text-center break-words">
-  IDENTITY_VERIFICATION_REQUIRED_BEFORE_ENCRYPTION_KEY_SETUP
-</p>
-
+                IDENTITY_VERIFICATION_REQUIRED_BEFORE_ENCRYPTION_KEY_SETUP
+              </p>
             </div>
           </div>
         </div>
