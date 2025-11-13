@@ -18,7 +18,7 @@ const LoginPage = ({ onLogin, onSwitchToRegister, onForgotPassword }) => {
 
     try {
       const response = await axios.post(
-        'http://localhost/graduatoin%20project/src/components/auth/login.php',
+        'http://localhost/graduatoin_project/src/components/auth/login.php',
         {
           email: email,
           password: password

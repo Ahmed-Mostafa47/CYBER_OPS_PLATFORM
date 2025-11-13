@@ -9,17 +9,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-require 'db_connect.php';
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header('Content-Type: application/json');
 
+// Simple connectivity check: GET ?ping=1 → {"success":true,"message":"pong"}
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['ping'])) {
+	echo json_encode(['success' => true, 'message' => 'pong']);
+	exit;
+}
+
+require 'db_connect.php';
+
+// Read JSON body if provided
 $data = file_get_contents('php://input');
-$input = json_decode($data, true);
+$input = null;
+if ($data !== false && strlen(trim($data)) > 0) {
+	$input = json_decode($data, true);
+}
+
+// Fallback: support application/x-www-form-urlencoded or multipart/form-data
+if ($input === null && !empty($_POST)) {
+	$input = [
+		'email' => isset($_POST['email']) ? $_POST['email'] : null,
+		'password' => isset($_POST['password']) ? $_POST['password'] : null
+	];
+}
 
 // Check if JSON decoding failed
-if (json_last_error() !== JSON_ERROR_NONE) {
+if ($data && json_last_error() !== JSON_ERROR_NONE) {
     echo json_encode(['success' => false, 'message' => 'Invalid JSON data: ' . json_last_error_msg()]);
     exit;
 }
