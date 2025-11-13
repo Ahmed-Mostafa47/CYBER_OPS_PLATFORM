@@ -37,7 +37,7 @@ const Navbar = ({ setCurrentPage, onLogout, currentPage, currentUser }) => {
               <Terminal className="w-5 h-5 text-white" />
             </div>
             <span className="text-xl font-bold text-green-400 font-mono tracking-tight">
-              CYBER_OPS
+              HACK_ME
             </span>
           </button>
 

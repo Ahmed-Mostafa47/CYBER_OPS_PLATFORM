@@ -33,8 +33,10 @@ function AppContent() {
   const [pendingUser, setPendingUser] = useState(null);
   const [verificationEmail, setVerificationEmail] = useState("");
 
-  // 📍 تحديد الصفحة الحالية بناءً على المسار
   useEffect(() => {
+    if (!authMode) {
+      setAuthMode("login");
+    }
     const path = location.pathname;
     if (path === "/register") setAuthMode("register");
     else if (path === "/verify") setAuthMode("verification");
@@ -43,7 +45,6 @@ function AppContent() {
     else setAuthMode("login");
   }, [location]);
 
-  // ✅ استرجاع الإيميل من sessionStorage لو الصفحة اتعملها refresh
   useEffect(() => {
     const savedEmail = sessionStorage.getItem("verificationEmail");
     if (savedEmail && !verificationEmail) {
@@ -51,7 +52,6 @@ function AppContent() {
     }
   }, [verificationEmail]);
 
-  // 🚀 بدء التسجيل
   const handleRegisterStart = async (userData) => {
     try {
       const response = await fetch(
@@ -79,17 +79,14 @@ function AppContent() {
     }
   };
 
-  // ✅ بعد التحقق من الكود
   const handleVerificationComplete = () => {
     navigate("/set-password");
   };
 
-  // 🔁 إعادة إرسال كود التحقق
   const handleResendCode = () => {
     alert("📧 Verification code re-sent to " + verificationEmail);
   };
 
-  // 🔐 بعد تعيين الباسورد
   const handlePasswordSet = async (password) => {
     const completeUser = {
       ...pendingUser,
@@ -129,7 +126,6 @@ function AppContent() {
     navigate("/");
   };
 
-  // 👇 صفحات الأوث
   const renderAuthPage = () => {
     switch (authMode) {
       case "login":
@@ -150,7 +146,9 @@ function AppContent() {
       case "verification":
         return (
           <EmailVerificationPage
-            email={verificationEmail || sessionStorage.getItem("verificationEmail")}
+            email={
+              verificationEmail || sessionStorage.getItem("verificationEmail")
+            }
             onVerificationComplete={handleVerificationComplete}
             onResendCode={handleResendCode}
           />
@@ -158,7 +156,9 @@ function AppContent() {
       case "setPassword":
         return (
           <SetPasswordPage
-            email={verificationEmail || sessionStorage.getItem("verificationEmail")}
+            email={
+              verificationEmail || sessionStorage.getItem("verificationEmail")
+            }
             onPasswordSet={handlePasswordSet}
             onBackToVerification={handleBackToVerification}
           />
@@ -176,7 +176,6 @@ function AppContent() {
     }
   };
 
-  // 👇 صفحات البرنامج الرئيسية
   const renderPage = () => {
     const path = location.pathname;
     switch (path) {

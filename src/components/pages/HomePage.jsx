@@ -21,7 +21,7 @@ const HomePage = ({ setCurrentPage }) => {
             <Terminal className="w-12 h-12 text-green-400" />
           </div>
           <h1 className="text-6xl font-bold text-green-400 mb-6 font-mono tracking-tight">
-            CYBER_OPS_PLATFORM
+            HACK_ME_PLATFORM
           </h1>
           <p className="text-2xl text-gray-400 mb-8 font-mono">
             // ACCESS_GRANTED: WELCOME_OPERATIVE

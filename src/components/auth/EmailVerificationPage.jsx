@@ -68,7 +68,6 @@ const EmailVerificationPage = ({
     }
   };
 
-  // ✅ هنا التعديل الرئيسي
 
   const handleSubmit = async (verificationCode = code.join("")) => {
     if (verificationCode.length !== 6) {
@@ -118,7 +117,7 @@ const EmailVerificationPage = ({
     setCode(["", "", "", "", "", ""]);
     setError("");
 
-    // 🔄 استدعاء الـ API اللي بيبعت الكود الجديد
+    
     onResendCode();
 
     setTimeout(() => {

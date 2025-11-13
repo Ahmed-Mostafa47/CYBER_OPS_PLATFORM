@@ -132,7 +132,7 @@ const handleSubmit = async (e) => {
                     onChange={handleChange}
                     required
                     className="w-full pl-12 pr-4 py-4 bg-gray-700/50 border-2 border-gray-600 rounded-lg text-white placeholder-gray-500 outline-none focus:border-blue-500 focus:bg-gray-700/80 transition-all duration-300 font-mono"
-                    placeholder="John Smith"
+                    placeholder="Ahmed Mohammed"
                   />
                 </div>
               </div>
