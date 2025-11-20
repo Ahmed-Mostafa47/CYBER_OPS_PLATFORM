@@ -5,7 +5,6 @@ export const useAuth = () => {
   const [currentUser, setCurrentUser] = useState(null);
 
   const handleLogin = (userData) => {
-    console.log("Authentication successful!", userData);
     setIsLoggedIn(true);
     setCurrentUser(userData);
 
@@ -14,7 +13,6 @@ export const useAuth = () => {
   };
 
   const handleRegister = (userData) => {
-    console.log("Registration successful!", userData);
     setIsLoggedIn(true);
     setCurrentUser(userData);
 
@@ -23,7 +21,6 @@ export const useAuth = () => {
   };
 
   const handleLogout = () => {
-    console.log("Logging out operative...");
     setIsLoggedIn(false);
     setCurrentUser(null);
 

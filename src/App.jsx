@@ -4,26 +4,39 @@ import {
   useNavigate,
   useLocation,
 } from "react-router-dom";
-import LoginPage from "./components/auth/LoginPage";
-import RegisterPage from "./components/auth/RegisterPage";
-import EmailVerificationPage from "./components/auth/EmailVerificationPage";
-import SetPasswordPage from "./components/auth/SetPasswordPage";
-import ForgotPasswordPage from "./components/auth/ForgotPasswordPage";
-import Navbar from "./components/layout/Navbar";
-import HomePage from "./components/pages/HomePage";
-import Dashboard from "./components/pages/Dashboard";
-import TrainingSelectionPage from "./components/pages/TrainingSelectionPage";
-import LabsPage from "./components/pages/LabsPage";
-import LabDetailPage from "./components/pages/LabDetailPage";
-import ChallengePage from "./components/pages/ChallengePage";
-import CommentsPage from "./components/pages/CommentsPage";
+import LoginPage from "./features/auth/pages/LoginPage";
+import RegisterPage from "./features/auth/pages/RegisterPage";
+import EmailVerificationPage from "./features/auth/pages/EmailVerificationPage";
+import SetPasswordPage from "./features/auth/pages/SetPasswordPage";
+import ForgotPasswordPage from "./features/auth/pages/ForgotPasswordPage";
+import ResetPasswordPage from "./features/auth/pages/ResetPasswordPage";
+import ChangePasswordPage from "./features/auth/pages/ChangePasswordPage";
+import Navbar from "./features/layout/Navbar";
+import HomePage from "./features/home/HomePage";
+import DashboardPage from "./features/dashboard/DashboardPage";
+import TrainingSelectionPage from "./features/dashboard/TrainingSelectionPage";
+import LabsPage from "./features/labs/LabsPage";
+import LabDetailPage from "./features/labs/LabDetailPage";
+import ChallengePage from "./features/labs/ChallengePage";
+import CommentsPage from "./features/network/CommentsPage";
+import ProfilePage from "./features/profile/ProfilePage";
+import AdminDashboardPage from "./features/dashboard/AdminDashboardPage";
+import axios from "axios";
 import { useAuth } from "./hooks/useAuth";
 import { useLabs } from "./hooks/useLabs";
 import "./styles/animations.css";
 
+const API_BASE = "http://localhost/graduatoin_project/server/api";
+
 function AppContent() {
-  const { isLoggedIn, currentUser, handleLogin, handleRegister, handleLogout } =
-    useAuth();
+  const {
+    isLoggedIn,
+    currentUser,
+    handleLogin,
+    handleRegister,
+    handleLogout,
+    checkExistingSession,
+  } = useAuth();
   const { selectedLabType, setSelectedLabType } = useLabs();
 
   const navigate = useNavigate();
@@ -32,18 +45,33 @@ function AppContent() {
   const [authMode, setAuthMode] = useState("login");
   const [pendingUser, setPendingUser] = useState(null);
   const [verificationEmail, setVerificationEmail] = useState("");
+  const [roleRequestStatus, setRoleRequestStatus] = useState(null);
+  const [roleRequestLoading, setRoleRequestLoading] = useState(false);
+  const [roleRequestMessage, setRoleRequestMessage] = useState("");
+  const [pendingRoleRequests, setPendingRoleRequests] = useState([]);
+  const [adminStats, setAdminStats] = useState(null);
+  const [roleRequestAlert, setRoleRequestAlert] = useState(null);
+
+  useEffect(() => {
+    checkExistingSession();
+  }, []);
 
   useEffect(() => {
     if (!authMode) {
       setAuthMode("login");
     }
     const path = location.pathname;
+    // For authenticated routes, don't change authMode
+    if (isLoggedIn && (path === "/change-password" || path === "/profile")) {
+      return;
+    }
     if (path === "/register") setAuthMode("register");
     else if (path === "/verify") setAuthMode("verification");
     else if (path === "/set-password") setAuthMode("setPassword");
     else if (path === "/forgot-password") setAuthMode("forgotPassword");
+    else if (path === "/reset-password") setAuthMode("resetPassword");
     else setAuthMode("login");
-  }, [location]);
+  }, [location, isLoggedIn]);
 
   useEffect(() => {
     const savedEmail = sessionStorage.getItem("verificationEmail");
@@ -52,10 +80,28 @@ function AppContent() {
     }
   }, [verificationEmail]);
 
+  useEffect(() => {
+    if (currentUser?.user_id) {
+      fetchRoleRequestStatus(currentUser.user_id);
+    } else {
+      setRoleRequestStatus(null);
+      setRoleRequestMessage("");
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!roleRequestMessage) return;
+    const timer = setTimeout(() => {
+      setRoleRequestMessage("");
+      setRoleRequestAlert(null);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [roleRequestMessage]);
+
   const handleRegisterStart = async (userData) => {
     try {
       const response = await fetch(
-        "http://localhost/graduatoin%20project/src/components/auth/send_verification.php",
+        "http://localhost/graduatoin_project/server/auth/send_verification.php",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -74,7 +120,6 @@ function AppContent() {
         alert(data.message || "❌ Registration failed.");
       }
     } catch (error) {
-      console.error("Error:", error);
       alert("⚠️ Error connecting to server.");
     }
   };
@@ -92,14 +137,12 @@ function AppContent() {
     // Password is already set in the database by SetPasswordPage
     // userData contains the complete user information from the server response
     if (userData && userData.user_id) {
-      console.log("Account created successfully!", userData);
       // Clear pending user state
       setPendingUser(null);
       sessionStorage.removeItem("verificationEmail");
       alert("✅ Account created successfully! Please log in with your credentials.");
       navigate("/");
     } else {
-      console.error("Invalid user data received:", userData);
       alert("⚠️ Account created but there was an error. Please try logging in manually.");
       navigate("/");
     }
@@ -108,6 +151,8 @@ function AppContent() {
   const handleBackToVerification = () => navigate("/verify");
   const handleForgotPassword = () => navigate("/forgot-password");
   const handleBackToLogin = () => navigate("/");
+  const handleChangePassword = () => navigate("/change-password");
+  const handleProfilePasswordReset = () => navigate("/reset-password?mode=profile");
   const handleLoginSuccess = (userData) => {
     handleLogin(userData);
     navigate("/home");
@@ -116,6 +161,133 @@ function AppContent() {
     handleLogout();
     navigate("/");
   };
+
+  const fetchRoleRequestStatus = async (userId) => {
+    try {
+      const { data } = await axios.get(`${API_BASE}/request_role.php`, {
+        params: { user_id: userId },
+      });
+      if (data.success) {
+        setRoleRequestStatus(data.request?.status || null);
+      }
+    } catch (error) {
+      setRoleRequestAlert("error");
+      setRoleRequestMessage(
+        error.response?.data?.message || "Unable to load role requests."
+      );
+    }
+  };
+
+  const fetchPendingRoleRequests = async () => {
+    try {
+      const { data } = await axios.get(`${API_BASE}/request_role.php`, {
+        params: { all: 1 },
+      });
+      if (data.success) {
+        setPendingRoleRequests(data.requests || []);
+        setAdminStats(data.stats || null);
+      }
+    } catch (error) {
+      setRoleRequestAlert("error");
+      setRoleRequestMessage(
+        error.response?.data?.message || "Unable to load pending requests."
+      );
+    }
+  };
+
+  const handleRoleRequest = async (requestedRole, comment = "") => {
+    if (!currentUser?.user_id) {
+      console.error("No user_id available");
+      return;
+    }
+    setRoleRequestLoading(true);
+    setRoleRequestMessage("");
+    
+    const requestData = {
+      user_id: currentUser.user_id,
+      requested_role: requestedRole,
+      comment: comment,
+    };
+    
+    console.log("Sending role request:", requestData);
+    console.log("API URL:", `${API_BASE}/request_role.php`);
+    
+    try {
+      const response = await axios.post(`${API_BASE}/request_role.php`, requestData, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      console.log("Role request response:", response);
+      const data = response.data;
+      
+      if (data.success) {
+        setRoleRequestStatus(data.request?.status || "pending");
+        setRoleRequestMessage(
+          data.message || "Role request submitted successfully."
+        );
+        setRoleRequestAlert("success");
+        fetchPendingRoleRequests();
+      } else {
+        console.error("Role request failed - success is false:", data);
+        setRoleRequestMessage(data.message || "Unable to submit role request.");
+        setRoleRequestAlert("error");
+      }
+    } catch (error) {
+      console.error("Role request catch block - Full error:", error);
+      console.error("Error response:", error.response);
+      console.error("Error response data:", error.response?.data);
+      console.error("Error message:", error.message);
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.error || 
+                          error.message || 
+                          "Unable to submit role request.";
+      setRoleRequestMessage(errorMessage);
+      setRoleRequestAlert("error");
+    } finally {
+      setRoleRequestLoading(false);
+    }
+  };
+
+  const getUserRoles = () => {
+    if (!currentUser) return [];
+    if (Array.isArray(currentUser.roles)) {
+      return currentUser.roles;
+    }
+    if (currentUser.role) {
+      return [currentUser.role];
+    }
+    if (currentUser.profile_meta?.rank) {
+      return [currentUser.profile_meta.rank.toLowerCase()];
+    }
+    return [];
+  };
+
+  const hasRole = (roleName) => {
+    const normalized = roleName?.toLowerCase();
+    return getUserRoles()
+      .map((role) =>
+        typeof role === "string" ? role.toLowerCase() : String(role).toLowerCase()
+      )
+      .includes(normalized);
+  };
+
+  const isAdmin =
+    hasRole("admin") || currentUser?.profile_meta?.rank === "ADMIN";
+  const isInstructor =
+    hasRole("instructor") ||
+    currentUser?.profile_meta?.rank === "INSTRUCTOR";
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchPendingRoleRequests();
+    } else {
+      setPendingRoleRequests([]);
+      setAdminStats(null);
+    }
+  }, [isAdmin]);
 
   const renderAuthPage = () => {
     switch (authMode) {
@@ -156,6 +328,18 @@ function AppContent() {
         );
       case "forgotPassword":
         return <ForgotPasswordPage onBackToLogin={handleBackToLogin} />;
+      case "resetPassword":
+        const params = new URLSearchParams(location.search);
+        const resetToken = params.get("token");
+        return (
+          <ResetPasswordPage
+            token={resetToken}
+            onBackToLogin={handleBackToLogin}
+            onResetSuccess={() => {
+              handleBackToLogin();
+            }}
+          />
+        );
       default:
         return (
           <LoginPage
@@ -169,12 +353,15 @@ function AppContent() {
 
   const renderPage = () => {
     const path = location.pathname;
+    const params = new URLSearchParams(location.search);
+    const routeToken = params.get("token");
+    const resetMode = params.get("mode");
     switch (path) {
       case "/home":
       case "/":
         return <HomePage setCurrentPage={(p) => navigate(`/${p}`)} />;
       case "/dashboard":
-        return <Dashboard />;
+        return <DashboardPage />;
       case "/training":
         return (
           <TrainingSelectionPage
@@ -187,6 +374,10 @@ function AppContent() {
           <LabsPage
             setCurrentPage={(p) => navigate(`/${p}`)}
             selectedLabType={selectedLabType}
+            isAdmin={isAdmin}
+            isInstructor={isInstructor}
+            onEditLab={() => {}}
+            onRemoveLab={() => {}}
           />
         );
       case "/lab-detail":
@@ -194,7 +385,57 @@ function AppContent() {
       case "/challenge":
         return <ChallengePage setCurrentPage={(p) => navigate(`/${p}`)} />;
       case "/comments":
-        return <CommentsPage />;
+        return <CommentsPage currentUser={currentUser} isAdmin={isAdmin} />;
+      case "/profile":
+        return (
+          <ProfilePage
+            currentUser={currentUser}
+            onRequestRole={handleRoleRequest}
+            onChangePassword={handleChangePassword}
+            roleRequestStatus={roleRequestStatus}
+            isAdmin={isAdmin}
+            isInstructor={isInstructor}
+            roleRequestMessage={roleRequestMessage}
+            roleRequestLoading={roleRequestLoading}
+            roleRequestAlert={roleRequestAlert}
+          />
+        );
+      case "/admin":
+        if (!isAdmin) {
+          return (
+            <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black pt-32 text-center text-white font-mono">
+              <p className="text-sm text-gray-500">ACCESS_RESTRICTED</p>
+              <h1 className="text-4xl font-bold text-red-400 mt-4">
+                ADMIN_PRIVILEGES_REQUIRED
+              </h1>
+            </div>
+          );
+        }
+        return (
+          <AdminDashboardPage
+            pendingRoleRequests={pendingRoleRequests}
+            overviewStats={adminStats}
+          />
+        );
+      case "/reset-password":
+        return (
+          <ResetPasswordPage
+            token={routeToken}
+            isAuthenticatedReset={!routeToken && resetMode === "profile"}
+            currentUser={currentUser}
+            onBackToLogin={() => navigate("/profile")}
+            onResetSuccess={() => navigate("/home")}
+          />
+        );
+      case "/change-password":
+        return (
+          <ChangePasswordPage
+            currentUser={currentUser}
+            onBackToProfile={() => navigate("/profile")}
+            onPasswordChangeSuccess={() => navigate("/profile")}
+            onForgotPassword={handleForgotPassword}
+          />
+        );
       default:
         return <HomePage setCurrentPage={(p) => navigate(`/${p}`)} />;
     }
@@ -211,6 +452,7 @@ function AppContent() {
             onLogout={handleLogoutWithNavigation}
             currentPage={location.pathname.replace("/", "") || "home"}
             currentUser={currentUser}
+            isAdmin={isAdmin}
           />
           {renderPage()}
         </>
