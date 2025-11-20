@@ -29,8 +29,14 @@ import "./styles/animations.css";
 const API_BASE = "http://localhost/graduatoin_project/server/api";
 
 function AppContent() {
-  const { isLoggedIn, currentUser, handleLogin, handleRegister, handleLogout } =
-    useAuth();
+  const {
+    isLoggedIn,
+    currentUser,
+    handleLogin,
+    handleRegister,
+    handleLogout,
+    checkExistingSession,
+  } = useAuth();
   const { selectedLabType, setSelectedLabType } = useLabs();
 
   const navigate = useNavigate();
@@ -44,6 +50,11 @@ function AppContent() {
   const [roleRequestMessage, setRoleRequestMessage] = useState("");
   const [pendingRoleRequests, setPendingRoleRequests] = useState([]);
   const [adminStats, setAdminStats] = useState(null);
+  const [roleRequestAlert, setRoleRequestAlert] = useState(null);
+
+  useEffect(() => {
+    checkExistingSession();
+  }, []);
 
   useEffect(() => {
     if (!authMode) {
@@ -77,6 +88,15 @@ function AppContent() {
       setRoleRequestMessage("");
     }
   }, [currentUser]);
+
+  useEffect(() => {
+    if (!roleRequestMessage) return;
+    const timer = setTimeout(() => {
+      setRoleRequestMessage("");
+      setRoleRequestAlert(null);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [roleRequestMessage]);
 
   const handleRegisterStart = async (userData) => {
     try {
@@ -172,7 +192,7 @@ function AppContent() {
     }
   };
 
-  const handleRoleRequest = async (requestedRole) => {
+  const handleRoleRequest = async (requestedRole, comment = "") => {
     if (!currentUser?.user_id) return;
     setRoleRequestLoading(true);
     setRoleRequestMessage("");
@@ -180,18 +200,24 @@ function AppContent() {
       const { data } = await axios.post(`${API_BASE}/request_role.php`, {
         user_id: currentUser.user_id,
         requested_role: requestedRole,
+        comment: comment,
       });
       if (data.success) {
         setRoleRequestStatus(data.request?.status || "pending");
-        setRoleRequestMessage("Role request submitted for review.");
+        setRoleRequestMessage(
+          data.message || "Role request submitted successfully."
+        );
+        setRoleRequestAlert("success");
         fetchPendingRoleRequests();
       } else {
         setRoleRequestMessage(data.message || "Unable to submit role request.");
+        setRoleRequestAlert("error");
       }
     } catch (error) {
       setRoleRequestMessage(
         error.response?.data?.message || "Unable to submit role request."
       );
+      setRoleRequestAlert("error");
     } finally {
       setRoleRequestLoading(false);
     }
@@ -337,13 +363,13 @@ function AppContent() {
           <ProfilePage
             currentUser={currentUser}
             onRequestRole={handleRoleRequest}
-            onResetPassword={handleProfilePasswordReset}
             onChangePassword={handleChangePassword}
             roleRequestStatus={roleRequestStatus}
             isAdmin={isAdmin}
             isInstructor={isInstructor}
             roleRequestMessage={roleRequestMessage}
             roleRequestLoading={roleRequestLoading}
+            roleRequestAlert={roleRequestAlert}
           />
         );
       case "/admin":
@@ -398,6 +424,7 @@ function AppContent() {
             onLogout={handleLogoutWithNavigation}
             currentPage={location.pathname.replace("/", "") || "home"}
             currentUser={currentUser}
+            isAdmin={isAdmin}
           />
           {renderPage()}
         </>

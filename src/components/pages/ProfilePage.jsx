@@ -4,17 +4,19 @@ import { ShieldCheck, KeyRound, Award, Users } from "lucide-react";
 const ProfilePage = ({
   currentUser,
   onRequestRole,
-  onResetPassword,
   onChangePassword,
   roleRequestStatus,
   roleRequestMessage,
   roleRequestLoading = false,
   isAdmin,
   isInstructor,
+  roleRequestAlert,
 }) => {
   const profile = currentUser?.profile_meta || {};
   const canRequestRole = !isAdmin && !isInstructor;
   const [desiredRole, setDesiredRole] = useState("admin");
+  const [comment, setComment] = useState("");
+  const [showCommentModal, setShowCommentModal] = useState(false);
 
   const getStatusBadge = (status) => {
     if (!status) return null;
@@ -36,6 +38,17 @@ const ProfilePage = ({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black pt-20 pb-12">
+      {roleRequestMessage && (
+        <div
+          className={`fixed top-24 right-6 z-50 px-5 py-3 rounded-xl border shadow-lg font-mono text-sm transition-all duration-300 ${
+            roleRequestAlert === "error"
+              ? "bg-red-500/15 border-red-500/40 text-red-200"
+              : "bg-emerald-500/15 border-emerald-500/40 text-emerald-100"
+          }`}
+        >
+          {roleRequestMessage}
+        </div>
+      )}
       <div className="max-w-5xl mx-auto px-4">
         <div className="bg-gray-900/70 border border-green-500/20 rounded-2xl p-8 shadow-2xl backdrop-blur">
           <div className="flex flex-col lg:flex-row gap-8 items-center">
@@ -106,14 +119,58 @@ const ProfilePage = ({
               </div>
               <div className="space-y-4">
                 {canRequestRole && (
-                  <button
-                    onClick={() => onRequestRole(desiredRole)}
-                    disabled={roleRequestLoading || roleRequestStatus === "pending"}
-                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold border border-blue-500/40 hover:shadow-blue-500/20 transition-all duration-300 font-mono disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Users className="w-4 h-4" />
-                    {roleRequestLoading ? "PROCESSING..." : `REQUEST_${desiredRole.toUpperCase()}_ROLE`}
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setShowCommentModal(true)}
+                      disabled={roleRequestLoading || roleRequestStatus === "pending"}
+                      className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold border border-blue-500/40 hover:shadow-blue-500/20 transition-all duration-300 font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Users className="w-4 h-4" />
+                      {roleRequestLoading ? "PROCESSING..." : `REQUEST_${desiredRole.toUpperCase()}_ROLE`}
+                    </button>
+                    {showCommentModal && (
+                      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                        <div className="bg-gray-900 border border-blue-500/30 rounded-xl p-6 max-w-md w-full shadow-2xl">
+                          <div className="mb-4">
+                            <h3 className="text-xl font-bold text-blue-400 mb-2 font-mono">
+                              REQUEST_{desiredRole.toUpperCase()}_ROLE
+                            </h3>
+                            <p className="text-sm text-gray-400 font-mono">
+                              Add a comment explaining why you need this role (optional)
+                            </p>
+                          </div>
+                          <textarea
+                            value={comment}
+                            onChange={(e) => setComment(e.target.value)}
+                            placeholder="أضف تعليق أو اشرح سبب طلبك للدور...&#10;Add a comment or explain why you need this role..."
+                            className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white text-sm placeholder-gray-500 focus:border-blue-500 focus:outline-none resize-none font-mono"
+                            rows="5"
+                          />
+                          <div className="flex gap-3 mt-4">
+                            <button
+                              onClick={() => {
+                                setComment("");
+                                setShowCommentModal(false);
+                              }}
+                              className="flex-1 bg-gray-700 hover:bg-gray-800 text-white py-2.5 rounded-lg font-mono text-sm transition-all"
+                            >
+                              CANCEL
+                            </button>
+                            <button
+                              onClick={() => {
+                                onRequestRole(desiredRole, comment);
+                                setComment("");
+                                setShowCommentModal(false);
+                              }}
+                              className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-2.5 rounded-lg font-mono text-sm font-semibold transition-all shadow-lg"
+                            >
+                              SUBMIT_REQUEST
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
                 {canRequestRole && (
                   <div className="flex gap-3 text-xs font-mono text-gray-400 justify-center">
@@ -134,9 +191,15 @@ const ProfilePage = ({
                   </div>
                 )}
                 {roleRequestMessage && (
-                  <p className="text-xs text-center text-gray-400 font-mono">
+                  <div
+                    className={`text-xs font-mono text-center px-3 py-2 rounded-lg border ${
+                      roleRequestAlert === "error"
+                        ? "text-red-200 bg-red-500/10 border-red-500/30"
+                        : "text-green-200 bg-green-500/10 border-green-500/30"
+                    }`}
+                  >
                     {roleRequestMessage}
-                  </p>
+                  </div>
                 )}
                 <button
                   onClick={onChangePassword}

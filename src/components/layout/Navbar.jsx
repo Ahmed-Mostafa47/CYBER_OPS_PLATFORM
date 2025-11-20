@@ -1,8 +1,8 @@
 import React from 'react';
-import { Terminal, Cpu, Code, Users, Star } from 'lucide-react';
+import { Terminal, Cpu, Code, Users, Star, Shield } from 'lucide-react';
 import { navItems } from '../../data/navigationData';
 
-const Navbar = ({ setCurrentPage, onLogout, currentPage, currentUser }) => {
+const Navbar = ({ setCurrentPage, onLogout, currentPage, currentUser, isAdmin }) => {
   const getIcon = (iconName) => {
     const icons = {
       Terminal: Terminal,
@@ -63,6 +63,19 @@ const Navbar = ({ setCurrentPage, onLogout, currentPage, currentUser }) => {
                 </button>
               );
             })}
+            {isAdmin && (
+              <button
+                onClick={() => setCurrentPage('admin')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 border font-mono ${
+                  currentPage === 'admin'
+                    ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg border-purple-500/30'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800/50 border-gray-600'
+                }`}
+              >
+                <Shield className="w-4 h-4" />
+                <span className="hidden md:inline">ADMIN_DASHBOARD</span>
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
