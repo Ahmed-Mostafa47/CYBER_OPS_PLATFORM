@@ -33,7 +33,6 @@ function AppContent() {
     isLoggedIn,
     currentUser,
     handleLogin,
-    handleRegister,
     handleLogout,
     checkExistingSession,
   } = useAuth();
