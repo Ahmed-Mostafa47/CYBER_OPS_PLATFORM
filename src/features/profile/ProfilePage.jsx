@@ -142,7 +142,7 @@ const ProfilePage = ({
                           <textarea
                             value={comment}
                             onChange={(e) => setComment(e.target.value)}
-                            placeholder="أضف تعليق أو اشرح سبب طلبك للدور...&#10;Add a comment or explain why you need this role..."
+                            placeholder="Add a comment or explain why you need this role..."
                             className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white text-sm placeholder-gray-500 focus:border-blue-500 focus:outline-none resize-none font-mono"
                             rows="5"
                           />

@@ -276,7 +276,7 @@ const AdminDashboardPage = ({
                           <p className="text-xs text-gray-500 font-mono mb-1">REQUEST_ID</p>
                           <p className="text-sm text-gray-400 font-mono">#{requestId}</p>
                           <p className="text-xs text-gray-500 font-mono mt-2">
-                            {new Date(request.created_at).toLocaleDateString("ar-EG", {
+                            {new Date(request.created_at).toLocaleDateString("en-US", {
                               year: "numeric",
                               month: "short",
                               day: "numeric",
