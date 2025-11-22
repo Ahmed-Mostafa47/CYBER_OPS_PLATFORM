@@ -163,10 +163,10 @@ const AdminDashboardPage = ({
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-gray-800 pt-24 pb-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-gray-800 pt-20 sm:pt-24 pb-8 sm:pb-12 px-3 sm:px-4 md:px-6">
       {statusMessage && (
         <div
-          className={`fixed top-24 left-1/2 -translate-x-1/2 md:left-auto md:right-6 md:translate-x-0 z-50 px-5 py-3 rounded-xl border font-mono text-sm shadow-xl transition-all ${
+          className={`fixed top-20 sm:top-24 left-1/2 -translate-x-1/2 md:left-auto md:right-6 md:translate-x-0 z-50 px-3 sm:px-4 md:px-5 py-2 sm:py-3 rounded-lg sm:rounded-xl border font-mono text-xs sm:text-sm shadow-xl transition-all max-w-[90vw] ${
             statusType === "success"
               ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-100"
               : "bg-blue-500/15 border-blue-500/40 text-blue-100"
@@ -175,43 +175,43 @@ const AdminDashboardPage = ({
           {statusMessage}
         </div>
       )}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6">
-        <div className="mb-10 text-center">
-          <p className="text-sm text-gray-500 font-mono">
+      <div className="max-w-6xl mx-auto px-2 sm:px-4 md:px-6">
+        <div className="mb-6 sm:mb-8 md:mb-10 text-center">
+          <p className="text-xs sm:text-sm text-gray-500 font-mono">
             ADMINISTRATIVE_CONTROL
           </p>
-          <h1 className="text-3xl sm:text-4xl font-bold text-white font-mono mt-2">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white font-mono mt-1 sm:mt-2">
             ADMIN_DASHBOARD
           </h1>
-          <div className="flex flex-col items-center gap-3 mt-4 sm:flex-row sm:justify-center">
-            <p className="text-gray-400 font-mono text-sm">
+          <div className="flex flex-col items-center gap-2 sm:gap-3 mt-3 sm:mt-4 sm:flex-row sm:justify-center">
+            <p className="text-gray-400 font-mono text-xs sm:text-sm text-center sm:text-left">
               SYSTEM_OVERVIEW_AND_ROLE_GOVERNANCE
             </p>
             <button
               onClick={fetchLatestRequests}
               disabled={isRefreshing}
-              className="px-4 py-2 rounded-lg border border-blue-500/50 text-blue-200 font-mono text-xs hover:bg-blue-500/10 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg border border-blue-500/50 text-blue-200 font-mono text-[10px] sm:text-xs hover:bg-blue-500/10 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isRefreshing ? "REFRESHING..." : "REFRESH_FEED"}
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 mb-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6 mb-6 sm:mb-8 md:mb-10">
           {stats.map((stat) => {
             const Icon = stat.icon;
             return (
               <div
                 key={stat.label}
-                className="bg-gray-900/70 border border-gray-700 rounded-2xl p-5 sm:p-6 shadow-xl"
+                className="bg-gray-900/70 border border-gray-700 rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 shadow-xl"
               >
                 <div
-                  className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center mb-4 border border-white/20`}
+                  className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center mb-3 sm:mb-4 border border-white/20`}
                 >
-                  <Icon className="w-6 h-6 text-white" />
+                  <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
-                <p className="text-sm text-gray-500 font-mono">{stat.label}</p>
-                <p className="text-3xl font-bold text-white font-mono">
+                <p className="text-xs sm:text-sm text-gray-500 font-mono">{stat.label}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-white font-mono">
                   {stat.value}
                 </p>
               </div>

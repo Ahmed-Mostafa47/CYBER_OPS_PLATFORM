@@ -189,7 +189,7 @@ const SetPasswordPage = ({ email, onPasswordSet, onBackToVerification }) => {
                 SECURE_ACCESS
               </h1>
               <p className="text-gray-400 font-mono text-sm">
-                ENCRYPTION_KEY_SETUP
+                PASSWORD_SETUP
               </p>
             </div>
           </div>
@@ -197,7 +197,7 @@ const SetPasswordPage = ({ email, onPasswordSet, onBackToVerification }) => {
           <div className="p-8">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-white mb-2 font-mono">
-                SET_ENCRYPTION_KEY
+                SET_PASSWORD
               </h2>
               <p className="text-gray-400 font-mono text-center">
                 OPERATIVE: {userEmail}
@@ -208,7 +208,7 @@ const SetPasswordPage = ({ email, onPasswordSet, onBackToVerification }) => {
               {/* Password Input */}
               <div className="relative group">
                 <label className="block text-sm font-semibold text-gray-400 mb-2 font-mono text-left">
-                  NEW_ENCRYPTION_KEY
+                  NEW_PASSWORD
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-indigo-400" />
@@ -269,7 +269,7 @@ const SetPasswordPage = ({ email, onPasswordSet, onBackToVerification }) => {
               {/* Confirm Password Input */}
               <div className="relative group">
                 <label className="block text-sm font-semibold text-gray-400 mb-2 font-mono text-left">
-                  CONFIRM_ENCRYPTION_KEY
+                  CONFIRM_PASSWORD
                 </label>
                 <div className="relative">
                   <Key className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-indigo-400" />
@@ -280,7 +280,7 @@ const SetPasswordPage = ({ email, onPasswordSet, onBackToVerification }) => {
                     onChange={handleChange}
                     required
                     className="w-full pl-12 pr-12 py-4 bg-gray-700/50 border-2 border-gray-600 rounded-lg text-white placeholder-gray-500 outline-none focus:border-indigo-500 focus:bg-gray-700/80 transition-all duration-300 font-mono"
-                    placeholder="REPEAT_ENCRYPTION_KEY"
+                    placeholder="REPEAT_PASSWORD"
                   />
                   <button
                     type="button"
