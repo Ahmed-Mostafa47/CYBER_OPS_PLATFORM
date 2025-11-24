@@ -279,12 +279,12 @@ function handle_delete_comment(mysqli $conn, array $segments): void
 function extract_comment_id(array $segments): int
 {
     // First try to get from PATH_INFO segments (e.g., /comments/3)
-    if (!empty($segments)) {
-        $first = reset($segments);
-        if (is_numeric($first)) {
-            return (int)$first;
-        }
-    }
+    // if (!empty($segments)) {
+    //     $first = reset($segments);
+    //     if (is_numeric($first)) {
+    //         return (int)$first;
+    //     }
+    // }
 
     // Then try query parameter (e.g., /comments.php?id=3)
     if (isset($_GET['id']) && is_numeric($_GET['id'])) {
