@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 // Check if vendor autoload exists before requiring
-$vendorAutoload = __DIR__ . '/../../src/components/auth/vendor/autoload.php';
+$vendorAutoload = __DIR__ . '/../auth/vendor/autoload.php';
 $mailerAvailable = false;
 
 if (file_exists($vendorAutoload)) {
@@ -13,6 +13,9 @@ if (file_exists($vendorAutoload)) {
         error_log('Failed to load PHPMailer: ' . $e->getMessage());
         $mailerAvailable = false;
     }
+} else {
+    error_log('PHPMailer vendor autoload not found at: ' . $vendorAutoload);
+    $mailerAvailable = false;
 }
 
 const CYBEROPS_MAIL_USERNAME = 'deboabdo1234@gmail.com';
