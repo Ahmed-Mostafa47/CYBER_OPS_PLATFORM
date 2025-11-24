@@ -4,7 +4,7 @@ declare(strict_types=1);
 // Aiven Cloud MySQL connection settings
 $dbHost = 'mysql-2fba11c2-hackme-2bfc.k.aivencloud.com';
 $dbUser = 'avnadmin';
-$dbPass = ''; // use password for server aiven
+$dbPass = 'AVNS_9bCdlZ5aiyIu2JCdzy2'; // use password for server aiven
 $dbName = 'ctf_platform';
 $dbPort = 14666;
 
