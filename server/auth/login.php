@@ -83,7 +83,27 @@ $stmt->close();
 
 // Check if user exists
 if (!$user) {
-    echo json_encode(['success' => false, 'message' => 'Invalid email or password']);
+    // Debug: Check if user exists but is inactive or doesn't exist
+    $debug_stmt = $conn->prepare('SELECT user_id, email, is_active FROM users WHERE email = ? LIMIT 1');
+    if ($debug_stmt) {
+        $debug_stmt->bind_param('s', $email);
+        $debug_stmt->execute();
+        $debug_result = $debug_stmt->get_result();
+        $debug_user = $debug_result->fetch_assoc();
+        $debug_stmt->close();
+        
+        if ($debug_user) {
+            if ($debug_user['is_active'] == 0) {
+                echo json_encode(['success' => false, 'message' => 'Account is inactive. Please contact administrator.']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Invalid email or password']);
+            }
+        } else {
+            echo json_encode(['success' => false, 'message' => 'No account found with this email. Please register first.']);
+        }
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Invalid email or password']);
+    }
     exit;
 }
 

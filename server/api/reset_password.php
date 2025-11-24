@@ -19,9 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-require_once __DIR__ . '/../utils/db.php';
-
-$conn = cyberops_get_db_connection();
+require_once __DIR__ . '/../utils/db_connect.php';
 $payload = json_decode(file_get_contents('php://input'), true);
 
 if (!is_array($payload)) {
