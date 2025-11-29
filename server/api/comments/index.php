@@ -66,14 +66,24 @@ function handle_get_comments(mysqli $conn): void
         $currentUserId = null;
     }
 
+    // Check if parent_id column exists
+    $checkColumn = $conn->query("SHOW COLUMNS FROM comments LIKE 'parent_id'");
+    $hasParentId = $checkColumn && $checkColumn->num_rows > 0;
+    $parentIdSelect = $hasParentId ? 'c.parent_id,' : 'NULL AS parent_id,';
+
+    // Fetch all comments (top-level and replies)
+    // Use UNIX_TIMESTAMP for timezone-independent timestamps
     if ($currentUserId) {
         $sql = "
             SELECT 
                 c.id,
+                {$parentIdSelect}
                 c.user_id,
                 c.content,
                 c.created_at,
+                UNIX_TIMESTAMP(c.created_at) as created_at_unix,
                 c.updated_at,
+                UNIX_TIMESTAMP(c.updated_at) as updated_at_unix,
                 u.username,
                 u.profile_meta,
                 COALESCE(l.like_count, 0) AS likes,
@@ -90,7 +100,7 @@ function handle_get_comments(mysqli $conn): void
                 FROM comment_likes
                 GROUP BY comment_id
             ) l ON l.comment_id = c.id
-            ORDER BY c.created_at DESC
+            ORDER BY c.created_at ASC
         ";
 
         $stmt = $conn->prepare($sql);
@@ -102,10 +112,13 @@ function handle_get_comments(mysqli $conn): void
         $sql = "
             SELECT 
                 c.id,
+                {$parentIdSelect}
                 c.user_id,
                 c.content,
                 c.created_at,
+                UNIX_TIMESTAMP(c.created_at) as created_at_unix,
                 c.updated_at,
+                UNIX_TIMESTAMP(c.updated_at) as updated_at_unix,
                 u.username,
                 u.profile_meta,
                 COALESCE(l.like_count, 0) AS likes,
@@ -117,7 +130,7 @@ function handle_get_comments(mysqli $conn): void
                 FROM comment_likes
                 GROUP BY comment_id
             ) l ON l.comment_id = c.id
-            ORDER BY c.created_at DESC
+            ORDER BY c.created_at ASC
         ";
 
         $stmt = $conn->prepare($sql);
@@ -128,18 +141,87 @@ function handle_get_comments(mysqli $conn): void
 
     $stmt->execute();
     $result = $stmt->get_result();
-    $comments = [];
+    $allComments = [];
+    $commentsMap = [];
 
+    // Build map of all comments
     while ($row = $result->fetch_assoc()) {
-        $comments[] = format_comment_row($row);
+        $comment = format_comment_row($row);
+        // Get parent_id from row (might be null if column doesn't exist)
+        $parentId = null;
+        if (isset($row['parent_id'])) {
+            $parentId = $row['parent_id'] !== null ? (int)$row['parent_id'] : null;
+        }
+        $comment['parent_id'] = $parentId;
+        $comment['replies'] = [];
+        // Store in map
+        $commentsMap[$comment['id']] = $comment;
+        $allComments[] = $comment;
     }
 
     $stmt->close();
 
+    // Build nested structure (only if parent_id column exists)
+    $topLevelComments = [];
+    $checkColumn = $conn->query("SHOW COLUMNS FROM comments LIKE 'parent_id'");
+    $hasParentId = $checkColumn && $checkColumn->num_rows > 0;
+    
+    if ($hasParentId) {
+        // First pass: identify top-level comments
+        foreach ($allComments as $comment) {
+            $parentId = $comment['parent_id'] ?? null;
+            if ($parentId === null || $parentId === 0) {
+                // Top-level comment - add to array (copy from map to ensure we have the right structure)
+                $topLevelComments[] = $commentsMap[$comment['id']];
+            }
+        }
+        
+        // Second pass: add replies to their parents in the topLevelComments array
+        foreach ($allComments as $comment) {
+            $parentId = $comment['parent_id'] ?? null;
+            if ($parentId !== null && $parentId > 0) {
+                // This is a reply - find parent in topLevelComments and add reply
+                $parentIdInt = (int)$parentId;
+                foreach ($topLevelComments as &$topComment) {
+                    if ($topComment['id'] === $parentIdInt) {
+                        if (!isset($topComment['replies'])) {
+                            $topComment['replies'] = [];
+                        }
+                        $topComment['replies'][] = $commentsMap[$comment['id']];
+                        break;
+                    }
+                }
+                unset($topComment); // Break reference
+            }
+        }
+    } else {
+        // No parent_id column - all comments are top-level
+        $topLevelComments = $allComments;
+    }
+
+    // Sort top-level comments by created_at DESC
+    usort($topLevelComments, function($a, $b) {
+        $timeA = strtotime($a['created_at'] ?? '1970-01-01');
+        $timeB = strtotime($b['created_at'] ?? '1970-01-01');
+        return $timeB - $timeA;
+    });
+
+    // Sort replies within each comment by created_at ASC (oldest first)
+    foreach ($topLevelComments as &$comment) {
+        if (!empty($comment['replies'])) {
+            usort($comment['replies'], function($a, $b) {
+                $timeA = strtotime($a['created_at'] ?? '1970-01-01');
+                $timeB = strtotime($b['created_at'] ?? '1970-01-01');
+                return $timeA - $timeB;
+            });
+        }
+    }
+    unset($comment); // Break reference
+
     ob_clean();
     echo json_encode([
         'success' => true,
-        'comments' => $comments,
+        'comments' => $topLevelComments,
     ]);
     ob_end_flush();
 }
@@ -154,6 +236,7 @@ function handle_create_comment(mysqli $conn): void
 
     $userId = isset($payload['user_id']) ? (int)$payload['user_id'] : 0;
     $content = isset($payload['content']) ? (string)$payload['content'] : '';
+    $parentId = isset($payload['parent_id']) ? (int)$payload['parent_id'] : null;
 
     if ($userId < 1) {
         http_response_code(400);
@@ -173,14 +256,57 @@ function handle_create_comment(mysqli $conn): void
         return;
     }
 
-    $sanitizedContent = sanitize_comment_text($content);
+    // Check if parent_id column exists
+    $checkColumn = $conn->query("SHOW COLUMNS FROM comments LIKE 'parent_id'");
+    $hasParentId = $checkColumn && $checkColumn->num_rows > 0;
 
-    $stmt = $conn->prepare("INSERT INTO comments (user_id, content) VALUES (?, ?)");
-    if (!$stmt) {
-        throw new RuntimeException('Failed to prepare insert statement: ' . $conn->error);
+    // Validate parent_id if provided
+    if ($parentId !== null && $parentId > 0) {
+        if (!$hasParentId) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Replies feature not available. Please run database migration: server/sql/add_comments_replies.sql',
+            ]);
+            return;
+        }
+        
+        $checkStmt = $conn->prepare("SELECT id FROM comments WHERE id = ? LIMIT 1");
+        if (!$checkStmt) {
+            throw new RuntimeException('Failed to prepare parent check: ' . $conn->error);
+        }
+        $checkStmt->bind_param('i', $parentId);
+        $checkStmt->execute();
+        $parentResult = $checkStmt->get_result();
+        if ($parentResult->num_rows === 0) {
+            $checkStmt->close();
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Parent comment not found',
+            ]);
+            return;
+        }
+        $checkStmt->close();
+    } else {
+        $parentId = null;
     }
 
-    $stmt->bind_param('is', $userId, $sanitizedContent);
+    $sanitizedContent = sanitize_comment_text($content);
+
+    if ($parentId !== null) {
+        $stmt = $conn->prepare("INSERT INTO comments (user_id, content, parent_id) VALUES (?, ?, ?)");
+        if (!$stmt) {
+            throw new RuntimeException('Failed to prepare insert statement: ' . $conn->error);
+        }
+        $stmt->bind_param('isi', $userId, $sanitizedContent, $parentId);
+    } else {
+        $stmt = $conn->prepare("INSERT INTO comments (user_id, content) VALUES (?, ?)");
+        if (!$stmt) {
+            throw new RuntimeException('Failed to prepare insert statement: ' . $conn->error);
+        }
+        $stmt->bind_param('is', $userId, $sanitizedContent);
+    }
 
     if (!$stmt->execute()) {
         throw new RuntimeException('Failed to create comment: ' . $stmt->error);
@@ -190,11 +316,20 @@ function handle_create_comment(mysqli $conn): void
     $stmt->close();
 
     $comment = fetch_comment_by_id($conn, $commentId, $userId);
+    if ($comment) {
+        if ($parentId !== null) {
+            $comment['parent_id'] = $parentId;
+        }
+        // Ensure replies array exists
+        if (!isset($comment['replies'])) {
+            $comment['replies'] = [];
+        }
+    }
 
     ob_clean();
     echo json_encode([
         'success' => true,
-        'message' => 'Comment created',
+        'message' => $parentId ? 'Reply created' : 'Comment created',
         'comment' => $comment,
     ]);
     ob_end_flush();
