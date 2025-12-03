@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Shield, Users, Database, Activity } from "lucide-react";
+import { Shield, Users, Database, Activity, ChevronDown, ChevronUp, UserPlus, UserMinus } from "lucide-react";
 import axios from "axios";
 
 const API_BASE = "http://localhost/graduatoin_project/server/api";
@@ -7,6 +7,7 @@ const API_BASE = "http://localhost/graduatoin_project/server/api";
 const AdminDashboardPage = ({
   pendingRoleRequests = [],
   overviewStats = {},
+  currentUser = null,
 }) => {
   const [requests, setRequests] = useState(pendingRoleRequests);
   const [processingId, setProcessingId] = useState(null);
@@ -19,6 +20,13 @@ const AdminDashboardPage = ({
     pendingRoleRequests.filter((r) => r.status === "pending" || !r.status)
       .length
   );
+  
+  // Users management state
+  const [showUsers, setShowUsers] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [availableRoles, setAvailableRoles] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [processingUserId, setProcessingUserId] = useState(null);
 
   useEffect(() => {
     setRequests(pendingRoleRequests);
@@ -88,6 +96,84 @@ const AdminDashboardPage = ({
   useEffect(() => {
     fetchLatestRequests();
   }, []);
+
+  // Fetch users when section is opened
+  useEffect(() => {
+    if (showUsers) {
+      fetchUsers();
+    }
+  }, [showUsers]);
+
+  const fetchUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const { data } = await axios.get(`${API_BASE}/manage_users.php`, {
+        params: {
+          current_user_id: currentUser?.user_id,
+        },
+      });
+      if (data.success) {
+        setUsers(data.users || []);
+        setAvailableRoles(data.available_roles || []);
+      }
+    } catch (error) {
+      triggerStatusMessage(
+        error.response?.data?.message || "FAILED TO LOAD USERS",
+        "error"
+      );
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const handleAssignRole = async (targetUserId, roleName) => {
+    setProcessingUserId(targetUserId);
+    try {
+      const { data } = await axios.post(`${API_BASE}/manage_users.php`, {
+        current_user_id: currentUser?.user_id,
+        target_user_id: targetUserId,
+        role_name: roleName,
+      });
+      if (data.success) {
+        triggerStatusMessage(
+          `ROLE ${roleName.toUpperCase()} ASSIGNED (PREVIOUS_ROLES_REMOVED)`,
+          "success"
+        );
+        fetchUsers();
+      }
+    } catch (error) {
+      triggerStatusMessage(
+        error.response?.data?.message || "FAILED TO ASSIGN ROLE",
+        "error"
+      );
+    } finally {
+      setProcessingUserId(null);
+    }
+  };
+
+  const handleRemoveRole = async (targetUserId, roleName) => {
+    setProcessingUserId(targetUserId);
+    try {
+      const { data } = await axios.put(`${API_BASE}/manage_users.php`, {
+        current_user_id: currentUser?.user_id,
+        target_user_id: targetUserId,
+        role_name: roleName,
+      });
+      if (data.success) {
+        triggerStatusMessage(`ROLE ${roleName.toUpperCase()} REMOVED`, "success");
+        fetchUsers();
+      }
+    } catch (error) {
+      triggerStatusMessage(
+        error.response?.data?.message || "FAILED TO REMOVE ROLE",
+        "error"
+      );
+    } finally {
+      setProcessingUserId(null);
+    }
+  };
+
+  const isSuperAdmin = currentUser?.roles?.includes('superadmin') || currentUser?.permissions?.includes('manage_permissions');
 
   const handleApprove = async (requestId, userId) => {
     setProcessingId(requestId);
@@ -217,6 +303,170 @@ const AdminDashboardPage = ({
               </div>
             );
           })}
+        </div>
+
+        {/* Users Management Section */}
+        <div className="bg-gray-900/70 border border-gray-800 rounded-2xl p-6 shadow-2xl mb-6">
+          <button
+            onClick={() => setShowUsers(!showUsers)}
+            className="w-full flex items-center justify-between p-4 hover:bg-gray-800/50 rounded-xl transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <Users className="w-6 h-6 text-blue-400" />
+              <h2 className="text-2xl font-bold text-white font-mono">
+                USERS_MANAGEMENT
+              </h2>
+            </div>
+            {showUsers ? (
+              <ChevronUp className="w-5 h-5 text-gray-400" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-gray-400" />
+            )}
+          </button>
+
+          {showUsers && (
+            <div className="mt-6 border-t border-gray-700 pt-6">
+              {loadingUsers ? (
+                <div className="text-center py-10 text-gray-500 font-mono">
+                  LOADING_USERS...
+                </div>
+              ) : users.length === 0 ? (
+                <div className="text-center py-10 text-gray-500 font-mono">
+                  NO_USERS_FOUND
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-[600px] overflow-y-auto">
+                  {users.map((user) => {
+                    const userRoles = user.roles || [];
+                    // Only SuperAdmin can manage roles (assign/remove)
+                    const canManage = isSuperAdmin;
+                    
+                    return (
+                      <div
+                        key={user.user_id}
+                        className="bg-gray-800/60 border border-gray-700 rounded-xl p-5 hover:border-blue-500/50 transition-all"
+                      >
+                        <div className="flex flex-col gap-4">
+                          {/* User Header */}
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3 flex-1">
+                              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold font-mono border border-blue-500/30">
+                                {user.username?.charAt(0)?.toUpperCase() || "U"}
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-white font-mono font-semibold text-lg">
+                                  {user.full_name || user.username}
+                                </p>
+                                <p className="text-gray-400 text-xs font-mono">
+                                  @{user.username}
+                                </p>
+                                <p className="text-gray-500 text-xs font-mono">
+                                  {user.email}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-gray-500 font-mono mb-1">
+                                USER_ID
+                              </p>
+                              <p className="text-sm text-gray-400 font-mono">
+                                #{user.user_id}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Current Role */}
+                          <div className="bg-gray-900/40 border border-gray-700 rounded-lg p-3">
+                            <p className="text-xs text-gray-500 font-mono mb-2">
+                              CURRENT_ROLE
+                            </p>
+                            {userRoles.length > 0 ? (
+                              <span className="px-3 py-1.5 rounded-lg bg-blue-500/20 border border-blue-500/50 text-blue-300 font-mono text-sm font-semibold">
+                                {userRoles[0].toUpperCase()}
+                              </span>
+                            ) : (
+                              <span className="text-gray-500 font-mono text-xs">
+                                NO_ROLE_ASSIGNED
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Role Management */}
+                          {canManage && (
+                            <div className="bg-gray-900/40 border border-gray-700 rounded-lg p-4">
+                              <p className="text-xs text-gray-500 font-mono mb-3">
+                                ASSIGN_ROLE
+                              </p>
+                              
+                              {processingUserId === user.user_id ? (
+                                <div className="text-center py-3">
+                                  <p className="text-xs text-gray-400 font-mono">
+                                    PROCESSING...
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                  {availableRoles.map((role) => {
+                                    const hasRole = userRoles.includes(role.name.toLowerCase());
+                                    
+                                    return (
+                                      <button
+                                        key={role.role_id}
+                                        onClick={() => {
+                                          // Always allow clicking to change role (single role system)
+                                          handleAssignRole(user.user_id, role.name);
+                                        }}
+                                        disabled={processingUserId === user.user_id}
+                                        className={`px-3 py-2 rounded-lg border font-mono text-xs font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                                          hasRole
+                                            ? "bg-blue-500/20 border-blue-500/50 text-blue-300"
+                                            : "bg-gray-800/50 border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500"
+                                        }`}
+                                      >
+                                        {role.name.toUpperCase()}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                              
+                              <p className="text-xs text-gray-500 font-mono mt-3 text-center italic">
+                                ASSIGNING_NEW_ROLE_WILL_REMOVE_CURRENT_ROLE
+                              </p>
+                            </div>
+                          )}
+
+                          {/* User Status */}
+                          <div className="flex items-center gap-4 text-xs font-mono">
+                            <div>
+                              <span className="text-gray-500">STATUS: </span>
+                              <span
+                                className={
+                                  user.is_active
+                                    ? "text-green-400"
+                                    : "text-red-400"
+                                }
+                              >
+                                {user.is_active ? "ACTIVE" : "INACTIVE"}
+                              </span>
+                            </div>
+                            {user.last_login && (
+                              <div>
+                                <span className="text-gray-500">LAST_LOGIN: </span>
+                                <span className="text-gray-400">
+                                  {new Date(user.last_login).toLocaleDateString()}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="bg-gray-900/70 border border-gray-800 rounded-2xl p-6 shadow-2xl">

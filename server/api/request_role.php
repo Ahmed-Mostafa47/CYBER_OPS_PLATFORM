@@ -22,7 +22,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // Load DB Connection
-require_once __DIR__ . '/../utils/db_connect.php';  
+require_once __DIR__ . '/../utils/db_connect.php';
+require_once __DIR__ . '/../utils/permissions.php';
+require_once __DIR__ . '/../utils/permissions.php';  
 
 // Try to load mailer, but don't fail if it's not available
 $GLOBALS['mailerLoaded'] = false;
@@ -403,10 +405,27 @@ function handle_put_request(mysqli $conn)
 
     if ($status === 'approved') {
         // Get the requested role
-        $requested_role = strtoupper($request['requested_role']);
+        $requested_role = strtolower(trim($request['requested_role']));
+        $userId = (int)$request['user_id'];
         
-        // Update user's role in user_roles table (if using role-based system)
-        // Or update profile_meta if using JSON-based roles
+        // Remove all existing roles first (single role system)
+        $existingRoles = getUserRoles($conn, $userId);
+        foreach ($existingRoles as $existingRole) {
+            removeRole($conn, $userId, $existingRole);
+        }
+        
+        // Assign new role using the new role-based system
+        $roleAssigned = assignRole($conn, $userId, $requested_role, null);
+        
+        if (!$roleAssigned) {
+            ob_clean();
+            echo json_encode(['success' => false, 'message' => 'Failed to assign role. Role may not exist.']);
+            ob_end_flush();
+            return;
+        }
+        
+        // Also update profile_meta for backward compatibility
+        $requested_role_upper = strtoupper($requested_role);
         $update_stmt = $conn->prepare("
             UPDATE users 
             SET profile_meta = JSON_SET(
@@ -415,20 +434,32 @@ function handle_put_request(mysqli $conn)
             )
             WHERE user_id = ?
         ");
-        $update_stmt->bind_param('si', $requested_role, $request['user_id']);
-        $update_stmt->execute();
-        $update_stmt->close();
+        if ($update_stmt) {
+            $update_stmt->bind_param('si', $requested_role_upper, $userId);
+            $update_stmt->execute();
+            $update_stmt->close();
+        }
 
         // Update request status
-        $conn->query("UPDATE role_requests SET status = 'approved' WHERE id = $request_id");
+        $update_status_stmt = $conn->prepare("UPDATE role_requests SET status = 'approved', updated_at = NOW() WHERE id = ?");
+        if ($update_status_stmt) {
+            $update_status_stmt->bind_param('i', $request_id);
+            $update_status_stmt->execute();
+            $update_status_stmt->close();
+        }
 
         ob_clean();
-        echo json_encode(['success' => true, 'message' => 'Request approved']);
+        echo json_encode(['success' => true, 'message' => 'Request approved and role assigned']);
         ob_end_flush();
 
     } elseif ($status === 'rejected') {
+        $reject_stmt = $conn->prepare("UPDATE role_requests SET status = 'rejected', updated_at = NOW() WHERE id = ?");
+        if ($reject_stmt) {
+            $reject_stmt->bind_param('i', $request_id);
+            $reject_stmt->execute();
+            $reject_stmt->close();
+        }
 
-        $conn->query("UPDATE role_requests SET status = 'rejected' WHERE id = $request_id");
         ob_clean();
         echo json_encode(['success' => true, 'message' => 'Request rejected']);
         ob_end_flush();

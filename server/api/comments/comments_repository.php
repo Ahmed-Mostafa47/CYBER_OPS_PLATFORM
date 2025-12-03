@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../utils/permissions.php';
+
 function sanitize_comment_text(string $text): string
 {
     $clean = trim($text);
@@ -158,28 +160,6 @@ function fetch_comment_by_id(mysqli $conn, int $commentId, ?int $currentUserId =
     return $comment;
 }
 
-function user_is_admin(mysqli $conn, int $userId): bool
-{
-    $stmt = $conn->prepare("SELECT profile_meta FROM users WHERE user_id = ? LIMIT 1");
-    if (!$stmt) {
-        throw new RuntimeException('Failed to prepare role query: ' . $conn->error);
-    }
-
-    $stmt->bind_param('i', $userId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $user = $result->fetch_assoc();
-    $stmt->close();
-
-    if (!$user) {
-        return false;
-    }
-
-    // Check profile_meta for rank
-    $profileMeta = parse_profile_meta($user['profile_meta'] ?? null);
-    $rank = $profileMeta['rank'] ?? '';
-
-    return strtoupper((string)$rank) === 'ADMIN';
-}
-
+// user_is_admin function is now provided by permissions.php
+// This file includes permissions.php at the top, so the function is available here
 
