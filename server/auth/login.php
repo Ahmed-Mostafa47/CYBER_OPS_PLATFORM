@@ -21,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['ping'])) {
 }
 
 require_once __DIR__ . '/../utils/db_connect.php';
+require_once __DIR__ . '/../utils/permissions.php';
 
 // Read JSON body if provided
 $data = file_get_contents('php://input');
@@ -130,6 +131,38 @@ if (is_string($profile_meta)) {
     }
 }
 
+// Get user roles from user_roles table
+$userRoles = getUserRoles($conn, (int)$user['user_id']);
+$userPermissions = getUserPermissions($conn, (int)$user['user_id']);
+
+// If user has no roles, assign default 'user' role
+if (empty($userRoles)) {
+    // Check if roles table has data (system is set up)
+    $rolesCheck = $conn->query("SELECT COUNT(*) as count FROM roles");
+    if ($rolesCheck) {
+        $rolesCount = $rolesCheck->fetch_assoc()['count'];
+        if ($rolesCount > 0) {
+            // System is set up, assign default user role
+            assignRole($conn, (int)$user['user_id'], 'user');
+            $userRoles = getUserRoles($conn, (int)$user['user_id']);
+            $userPermissions = getUserPermissions($conn, (int)$user['user_id']);
+        }
+    }
+}
+
+// Backward compatibility: if profile_meta has rank, include it
+// But prioritize roles from user_roles table
+if (!empty($profile_meta['rank']) && empty($userRoles)) {
+    // Legacy support: convert old rank to role if no roles exist
+    $legacyRank = strtoupper($profile_meta['rank']);
+    if (in_array($legacyRank, ['ADMIN', 'INSTRUCTOR'])) {
+        $roleName = strtolower($legacyRank);
+        assignRole($conn, (int)$user['user_id'], $roleName);
+        $userRoles = getUserRoles($conn, (int)$user['user_id']);
+        $userPermissions = getUserPermissions($conn, (int)$user['user_id']);
+    }
+}
+
 // Return user data (without password_hash)
 $userData = [
     'user_id' => (int)$user['user_id'],
@@ -137,7 +170,9 @@ $userData = [
     'email' => $user['email'],
     'full_name' => $user['full_name'],
     'total_points' => (int)($user['total_points'] ?? 0),
-    'profile_meta' => $profile_meta
+    'profile_meta' => $profile_meta,
+    'roles' => $userRoles,
+    'permissions' => $userPermissions
 ];
 
 echo json_encode([

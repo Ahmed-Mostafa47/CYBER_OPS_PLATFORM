@@ -1,31 +1,31 @@
-#!/usr/bin/env pwsh
+﻿#!/usr/bin/env pwsh
 
-# 🧪 اختبار سريع لميزة Change Password (Windows PowerShell)
+# ≡ƒº¬ ╪º╪«╪¬╪¿╪º╪▒ ╪│╪▒┘è╪╣ ┘ä┘à┘è╪▓╪⌐ Change Password (Windows PowerShell)
 
 Write-Host "======================================" -ForegroundColor Cyan
-Write-Host "🧪 اختبار Change Password Feature" -ForegroundColor Cyan
+Write-Host "≡ƒº¬ ╪º╪«╪¬╪¿╪º╪▒ Change Password Feature" -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Cyan
 Write-Host ""
 
-# 1. التحقق من أن الملفات موجودة
-Write-Host "📁 التحقق من الملفات..." -ForegroundColor Yellow
+# 1. ╪º┘ä╪¬╪¡┘é┘é ┘à┘å ╪ú┘å ╪º┘ä┘à┘ä┘ü╪º╪¬ ┘à┘ê╪¼┘ê╪»╪⌐
+Write-Host "≡ƒôü ╪º┘ä╪¬╪¡┘é┘é ┘à┘å ╪º┘ä┘à┘ä┘ü╪º╪¬..." -ForegroundColor Yellow
 Write-Host ""
 
 if (Test-Path "src/components/auth/ChangePasswordPage.jsx") {
-    Write-Host "✅ ChangePasswordPage.jsx موجود" -ForegroundColor Green
+    Write-Host "Γ£à ChangePasswordPage.jsx ┘à┘ê╪¼┘ê╪»" -ForegroundColor Green
 } else {
-    Write-Host "❌ ChangePasswordPage.jsx غير موجود" -ForegroundColor Red
+    Write-Host "Γ¥î ChangePasswordPage.jsx ╪║┘è╪▒ ┘à┘ê╪¼┘ê╪»" -ForegroundColor Red
 }
 
 if (Test-Path "src/components/auth/change_password.php") {
-    Write-Host "✅ change_password.php موجود" -ForegroundColor Green
+    Write-Host "Γ£à change_password.php ┘à┘ê╪¼┘ê╪»" -ForegroundColor Green
 } else {
-    Write-Host "❌ change_password.php غير موجود" -ForegroundColor Red
+    Write-Host "Γ¥î change_password.php ╪║┘è╪▒ ┘à┘ê╪¼┘ê╪»" -ForegroundColor Red
 }
 
 Write-Host ""
 Write-Host "======================================" -ForegroundColor Cyan
-Write-Host "📊 الملفات المُنشأة:" -ForegroundColor Cyan
+Write-Host "≡ƒôè ╪º┘ä┘à┘ä┘ü╪º╪¬ ╪º┘ä┘à┘Å┘å╪┤╪ú╪⌐:" -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -39,45 +39,45 @@ Write-Host ""
     "FILES_INDEX.md"
 ) | ForEach-Object {
     if (Test-Path $_) {
-        Write-Host "✅ $_" -ForegroundColor Green
+        Write-Host "Γ£à $_" -ForegroundColor Green
     }
 }
 
 Write-Host ""
 Write-Host "======================================" -ForegroundColor Cyan
-Write-Host "🚀 خطوات الاختبار:" -ForegroundColor Cyan
+Write-Host "≡ƒÜÇ ╪«╪╖┘ê╪º╪¬ ╪º┘ä╪º╪«╪¬╪¿╪º╪▒:" -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "1️⃣  تشغيل dev server:" -ForegroundColor Yellow
+Write-Host "1∩╕ÅΓâú  ╪¬╪┤╪║┘è┘ä dev server:" -ForegroundColor Yellow
 Write-Host "    npm run dev" -ForegroundColor White
 Write-Host ""
-Write-Host "2️⃣  افتح المتصفح:" -ForegroundColor Yellow
+Write-Host "2∩╕ÅΓâú  ╪º┘ü╪¬╪¡ ╪º┘ä┘à╪¬╪╡┘ü╪¡:" -ForegroundColor Yellow
 Write-Host "    http://localhost:5174" -ForegroundColor White
 Write-Host ""
-Write-Host "3️⃣  سجل الدخول" -ForegroundColor Yellow
+Write-Host "3∩╕ÅΓâú  ╪│╪¼┘ä ╪º┘ä╪»╪«┘ê┘ä" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "4️⃣  انقر على PROFILE" -ForegroundColor Yellow
+Write-Host "4∩╕ÅΓâú  ╪º┘å┘é╪▒ ╪╣┘ä┘ë PROFILE" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "5️⃣  انقر على الزر الجديد CHANGE_PASSWORD" -ForegroundColor Yellow
+Write-Host "5∩╕ÅΓâú  ╪º┘å┘é╪▒ ╪╣┘ä┘ë ╪º┘ä╪▓╪▒ ╪º┘ä╪¼╪»┘è╪» CHANGE_PASSWORD" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "6️⃣  ملء النموذج وانقر UPDATE_PASSWORD" -ForegroundColor Yellow
+Write-Host "6∩╕ÅΓâú  ┘à┘ä╪í ╪º┘ä┘å┘à┘ê╪░╪¼ ┘ê╪º┘å┘é╪▒ UPDATE_PASSWORD" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "======================================" -ForegroundColor Cyan
-Write-Host "✅ كل شيء جاهز!" -ForegroundColor Green
+Write-Host "Γ£à ┘â┘ä ╪┤┘è╪í ╪¼╪º┘ç╪▓!" -ForegroundColor Green
 Write-Host "======================================" -ForegroundColor Cyan
 Write-Host ""
 
-# اختياري: اسأل المستخدم هل يريد تشغيل npm run dev
+# ╪º╪«╪¬┘è╪º╪▒┘è: ╪º╪│╪ú┘ä ╪º┘ä┘à╪│╪¬╪«╪»┘à ┘ç┘ä ┘è╪▒┘è╪» ╪¬╪┤╪║┘è┘ä npm run dev
 Write-Host ""
-Write-Host "هل تريد تشغيل dev server الآن؟ (Y/N)" -ForegroundColor Yellow
+Write-Host "┘ç┘ä ╪¬╪▒┘è╪» ╪¬╪┤╪║┘è┘ä dev server ╪º┘ä╪ó┘å╪ƒ (Y/N)" -ForegroundColor Yellow
 $response = Read-Host
 
 if ($response -eq "Y" -or $response -eq "y") {
     Write-Host ""
-    Write-Host "🚀 بدء تشغيل dev server..." -ForegroundColor Green
+    Write-Host "≡ƒÜÇ ╪¿╪»╪í ╪¬╪┤╪║┘è┘ä dev server..." -ForegroundColor Green
     npm run dev
 } else {
     Write-Host ""
-    Write-Host "📝 اكتب هذا الأمر عندما تكون جاهز:" -ForegroundColor Yellow
+    Write-Host "≡ƒô¥ ╪º┘â╪¬╪¿ ┘ç╪░╪º ╪º┘ä╪ú┘à╪▒ ╪╣┘å╪»┘à╪º ╪¬┘â┘ê┘å ╪¼╪º┘ç╪▓:" -ForegroundColor Yellow
     Write-Host "npm run dev" -ForegroundColor Cyan
 }

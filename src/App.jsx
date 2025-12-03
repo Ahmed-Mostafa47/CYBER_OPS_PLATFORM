@@ -274,7 +274,8 @@ function AppContent() {
   };
 
   const isAdmin =
-    hasRole("admin") || currentUser?.profile_meta?.rank === "ADMIN";
+    hasRole("admin") || hasRole("superadmin") || currentUser?.profile_meta?.rank === "ADMIN";
+  const isSuperAdmin = hasRole("superadmin");
   const isInstructor =
     hasRole("instructor") ||
     currentUser?.profile_meta?.rank === "INSTRUCTOR";
@@ -400,7 +401,7 @@ function AppContent() {
           />
         );
       case "/admin":
-        if (!isAdmin) {
+        if (!isAdmin && !isSuperAdmin) {
           return (
             <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black pt-32 text-center text-white font-mono">
               <p className="text-sm text-gray-500">ACCESS_RESTRICTED</p>
@@ -414,6 +415,7 @@ function AppContent() {
           <AdminDashboardPage
             pendingRoleRequests={pendingRoleRequests}
             overviewStats={adminStats}
+            currentUser={currentUser}
           />
         );
       case "/reset-password":

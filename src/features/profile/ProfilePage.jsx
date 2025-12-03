@@ -13,7 +13,9 @@ const ProfilePage = ({
   roleRequestAlert,
 }) => {
   const profile = currentUser?.profile_meta || {};
-  const canRequestRole = !isAdmin && !isInstructor;
+  const userRoles = currentUser?.roles || [];
+  const isSuperAdmin = userRoles.includes('superadmin');
+  const canRequestRole = !isAdmin && !isInstructor && !isSuperAdmin;
   const [desiredRole, setDesiredRole] = useState("admin");
   const [comment, setComment] = useState("");
   const [showCommentModal, setShowCommentModal] = useState(false);
@@ -65,9 +67,15 @@ const ProfilePage = ({
                 {currentUser?.full_name || currentUser?.username || "Operative"}
               </h1>
               <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
-                <span className="px-4 py-1 rounded-full bg-green-500/10 text-green-400 border border-green-500/30 font-mono text-sm">
-                  RANK_{profile.rank || "OPERATIVE"}
-                </span>
+                {isSuperAdmin ? (
+                  <span className="px-4 py-1 rounded-full bg-yellow-500/20 text-yellow-300 border-2 border-yellow-500/50 font-mono text-sm font-bold">
+                    SUPERADMIN
+                  </span>
+                ) : (
+                  <span className="px-4 py-1 rounded-full bg-green-500/10 text-green-400 border border-green-500/30 font-mono text-sm">
+                    RANK_{profile.rank || "OPERATIVE"}
+                  </span>
+                )}
                 <span className="px-4 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/30 font-mono text-sm">
                   SPECIALIZATION_{profile.specialization || "GENERAL"}
                 </span>

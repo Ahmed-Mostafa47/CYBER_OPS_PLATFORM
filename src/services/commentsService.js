@@ -8,8 +8,11 @@ export const fetchComments = async (userId) => {
   return data;
 };
 
-export const createComment = async ({ userId, content }) => {
+export const createComment = async ({ userId, content, parentId = null }) => {
   const payload = { user_id: userId, content };
+  if (parentId !== null && parentId > 0) {
+    payload.parent_id = parentId;
+  }
   const { data } = await apiClient.post(COMMENTS_ENDPOINT, payload);
   return data;
 };

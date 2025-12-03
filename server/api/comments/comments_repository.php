@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../utils/permissions.php';
+
 function sanitize_comment_text(string $text): string
 {
     $clean = trim($text);
@@ -28,8 +30,41 @@ function format_comment_row(array $row): array
         $profileMeta = parse_profile_meta($row['profile_meta']);
     }
 
+    // Format timestamp - use UNIX timestamp from MySQL for accurate timezone-independent calculation
+    $createdAt = $row['created_at'] ?? null;
+    if ($createdAt) {
+        // Prefer UNIX timestamp if available (timezone-independent)
+        if (isset($row['created_at_unix']) && $row['created_at_unix'] !== null) {
+            $unixTimestamp = (int)$row['created_at_unix'];
+            // Convert UNIX timestamp to ISO 8601 UTC format
+            $dt = new DateTime('@' . $unixTimestamp);
+            $dt->setTimezone(new DateTimeZone('UTC'));
+            $createdAt = $dt->format('Y-m-d\TH:i:s\Z');
+        } else {
+            // Fallback: use datetime string, convert space to T
+            if (is_string($createdAt) && strpos($createdAt, 'T') === false) {
+                $createdAt = str_replace(' ', 'T', $createdAt);
+            }
+        }
+    }
+    
+    $updatedAt = $row['updated_at'] ?? null;
+    if ($updatedAt) {
+        if (isset($row['updated_at_unix']) && $row['updated_at_unix'] !== null) {
+            $unixTimestamp = (int)$row['updated_at_unix'];
+            $dt = new DateTime('@' . $unixTimestamp);
+            $dt->setTimezone(new DateTimeZone('UTC'));
+            $updatedAt = $dt->format('Y-m-d\TH:i:s\Z');
+        } else {
+            if (is_string($updatedAt) && strpos($updatedAt, 'T') === false) {
+                $updatedAt = str_replace(' ', 'T', $updatedAt);
+            }
+        }
+    }
+
     return [
         'id' => (int)($row['id'] ?? 0),
+        'parent_id' => isset($row['parent_id']) ? (int)$row['parent_id'] : null,
         'user_id' => (int)($row['user_id'] ?? 0),
         'user' => $row['username'] ?? 'OPERATIVE',
         'avatar' => $profileMeta['avatar'] ?? '💀',
@@ -39,8 +74,9 @@ function format_comment_row(array $row): array
         'liked_by_current_user' => isset($row['liked_by_current_user'])
             ? (bool)$row['liked_by_current_user']
             : false,
-        'created_at' => $row['created_at'] ?? null,
-        'updated_at' => $row['updated_at'] ?? null,
+        'created_at' => $createdAt,
+        'updated_at' => $updatedAt,
+        'replies' => isset($row['replies']) ? $row['replies'] : [],
     ];
 }
 
@@ -50,10 +86,13 @@ function fetch_comment_by_id(mysqli $conn, int $commentId, ?int $currentUserId =
         $sql = "
             SELECT 
                 c.id,
+                c.parent_id,
                 c.user_id,
                 c.content,
                 c.created_at,
+                UNIX_TIMESTAMP(c.created_at) as created_at_unix,
                 c.updated_at,
+                UNIX_TIMESTAMP(c.updated_at) as updated_at_unix,
                 u.username,
                 u.profile_meta,
                 (
@@ -80,10 +119,13 @@ function fetch_comment_by_id(mysqli $conn, int $commentId, ?int $currentUserId =
         $sql = "
             SELECT 
                 c.id,
+                c.parent_id,
                 c.user_id,
                 c.content,
                 c.created_at,
+                UNIX_TIMESTAMP(c.created_at) as created_at_unix,
                 c.updated_at,
+                UNIX_TIMESTAMP(c.updated_at) as updated_at_unix,
                 u.username,
                 u.profile_meta,
                 (
@@ -113,31 +155,11 @@ function fetch_comment_by_id(mysqli $conn, int $commentId, ?int $currentUserId =
         return null;
     }
 
-    return format_comment_row($row);
+    $comment = format_comment_row($row);
+    $comment['replies'] = [];
+    return $comment;
 }
 
-function user_is_admin(mysqli $conn, int $userId): bool
-{
-    $stmt = $conn->prepare("SELECT profile_meta FROM users WHERE user_id = ? LIMIT 1");
-    if (!$stmt) {
-        throw new RuntimeException('Failed to prepare role query: ' . $conn->error);
-    }
-
-    $stmt->bind_param('i', $userId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $user = $result->fetch_assoc();
-    $stmt->close();
-
-    if (!$user) {
-        return false;
-    }
-
-    // Check profile_meta for rank
-    $profileMeta = parse_profile_meta($user['profile_meta'] ?? null);
-    $rank = $profileMeta['rank'] ?? '';
-
-    return strtoupper((string)$rank) === 'ADMIN';
-}
-
+// user_is_admin function is now provided by permissions.php
+// This file includes permissions.php at the top, so the function is available here
 

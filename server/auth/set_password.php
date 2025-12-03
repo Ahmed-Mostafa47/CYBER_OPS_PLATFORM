@@ -10,6 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 require_once __DIR__ . '/../utils/db_connect.php';
+require_once __DIR__ . '/../utils/permissions.php';
 header('Content-Type: application/json');
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
@@ -102,6 +103,9 @@ if (!$ins->execute()) {
 }
 $userid = $ins->insert_id;
 $ins->close();
+
+// Assign default 'user' role to new user
+assignRole($conn, $userid, 'user', null);
 
 // optional: delete verification entries for this email
 $del = $conn->prepare('DELETE FROM email_verifications WHERE email = ?');
