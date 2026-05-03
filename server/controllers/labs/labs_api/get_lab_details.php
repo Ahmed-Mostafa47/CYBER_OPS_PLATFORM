@@ -1,0 +1,264 @@
+<?php
+declare(strict_types=1);
+
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
+header('Content-Type: application/json; charset=utf-8');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    http_response_code(405);
+    echo json_encode(['success' => false, 'message' => 'Method Not Allowed']);
+    exit;
+}
+
+try {
+    require_once __DIR__ . '/../../../core/db/db_connect.php';
+    require_once __DIR__ . '/../../../core/config/labs_config.php';
+    require_once __DIR__ . '/../../../helpers/whitebox/whitebox_lab1_defaults.php';
+    require_once __DIR__ . '/../../../helpers/whitebox/whitebox_xss_defaults.php';
+    require_once __DIR__ . '/../../../helpers/utils/lab_production_state.php';
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Load error']);
+    exit;
+}
+
+if (!isset($conn) || !$conn) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Database connection failed']);
+    exit;
+}
+
+$conn->set_charset('utf8mb4');
+
+$labId = (int)($_GET['lab_id'] ?? $_GET['labId'] ?? 0);
+if ($labId < 1) {
+    echo json_encode(['success' => false, 'message' => 'Missing lab_id']);
+    exit;
+}
+
+$wbSqlId = hackme_whitebox_sql_lab_id();
+$isWbXss = hackme_whitebox_xss_is_supported($labId);
+// Legacy duplicate listing row: hide lab 11 only when it is not the configured SQL white-box id.
+if ($labId === 11 && $wbSqlId !== 11) {
+    echo json_encode(['success' => false, 'message' => 'Lab not found']);
+    exit;
+}
+
+$mapped = function_exists('hackme_whitebox_of_lab_id') ? hackme_whitebox_of_lab_id($labId) : null;
+$isMappedWhitebox = is_int($mapped) && $mapped > 0;
+$wbState = $isMappedWhitebox ? hackme_whitebox_production_state($conn, $labId) : null;
+
+$labSelect = "
+    SELECT
+        lab_id, title, description, icon, port, launch_path,
+        labtype_id, difficulty, points_total, is_published, visibility,
+        CASE WHEN COALESCE(solution, '') <> '' THEN 1 ELSE 0 END AS has_solution
+    FROM labs
+";
+
+$labPubRes = $conn->query($labSelect . " WHERE lab_id = $labId AND is_published = 1 AND visibility = 'public' LIMIT 1");
+
+if ($labPubRes && $labPubRes->num_rows > 0) {
+    $lab = $labPubRes->fetch_assoc();
+} elseif ($isMappedWhitebox) {
+    $labAnyRes = $conn->query($labSelect . " WHERE lab_id = $labId LIMIT 1");
+    if ($labAnyRes && $labAnyRes->num_rows > 0) {
+        error_log('[HackMe WARNING] get_lab_details: whitebox lab_id=' . $labId . ' exists but is not published/public; UI fallback row.');
+        $lab = $labAnyRes->fetch_assoc();
+    } else {
+        error_log('[HackMe CRITICAL] get_lab_details: whitebox lab_id=' . $labId . ' missing from labs; UI fallback only.');
+        // Generic fallback; title/description may be overridden from mapped black-box lab below.
+        $lab = [
+            'lab_id' => $labId,
+            'title' => 'WHITEBOX_LAB_' . $labId,
+            'description' => '',
+            'icon' => '💉',
+            'port' => null,
+            'launch_path' => '',
+            'labtype_id' => 1,
+            'difficulty' => 'medium',
+            'points_total' => 0,
+            'is_published' => 1,
+            'visibility' => 'public',
+            'has_solution' => 0,
+        ];
+    }
+} elseif ($labId === 18 || $labId === 19) {
+    $is18 = $labId === 18;
+    echo json_encode([
+        'success' => true,
+        'message' => 'OK',
+        'data' => [
+            'lab' => [
+                'lab_id' => $labId,
+                'title' => $is18 ? 'Access Control Bypass' : 'IDOR (White-box)',
+                'description' => $is18
+                    ? 'White-box: review the PHP bundle (public/ and includes/). Remove client-controlled session role assignment and enforce a server-side admin gate before ADMIN_PANEL output.'
+                    : 'White-box: review the PHP bundle. The profile endpoint trusts user_id from the URL — bind reads to the logged-in session user and block horizontal access (403).',
+                'icon' => '🔓',
+                'port' => 4003,
+                'launch_path' => $is18 ? '/lab/1' : '/lab/2',
+                'labtype_id' => 1,
+                'difficulty' => 'medium',
+                'points_total' => 100,
+                'is_published' => true,
+                'visibility' => 'public',
+                'has_solution' => false,
+                'hints' => [],
+            ],
+        ],
+    ]);
+    exit;
+} elseif ($isWbXss) {
+    $fallback = hackme_whitebox_xss_fallback_lab_row($labId);
+    echo json_encode([
+        'success' => true,
+        'message' => 'OK',
+        'data' => [
+            'lab' => [
+                'lab_id' => $labId,
+                'title' => (string) ($fallback['title'] ?? ($labId === 21 ? 'DOM XSS (White-box)' : 'Reflected XSS (White-box)')),
+                'description' => (string) ($fallback['description'] ?? 'White-box XSS lab.'),
+                'icon' => '⚡',
+                'port' => $labId === 21 ? 4002 : 4001,
+                'launch_path' => '/',
+                'labtype_id' => 1,
+                'difficulty' => 'medium',
+                'points_total' => 100,
+                'is_published' => true,
+                'visibility' => 'public',
+                'has_solution' => false,
+                'hints' => $labId === 21
+                    ? [
+                        'Search for unsafe innerHTML usage in JavaScript.',
+                        'Replace sink with textContent or createTextNode.',
+                    ]
+                    : [
+                        'Reflected user input must be output-encoded.',
+                        'Use htmlspecialchars for HTML context.',
+                    ],
+            ],
+        ],
+    ]);
+    exit;
+} else {
+    echo json_encode(['success' => false, 'message' => 'Lab not found']);
+    exit;
+}
+
+$lidRow = (int) ($lab['lab_id'] ?? 0);
+if ($isMappedWhitebox || $lidRow === 18 || $lidRow === 19) {
+    $lab['labtype_id'] = 1;
+}
+if ($lidRow === 1) {
+    $lab['labtype_id'] = 2;
+}
+if ($lidRow === 18) {
+    $lab['title'] = 'Access Control Bypass';
+}
+if ($lidRow === 19) {
+    $lab['title'] = 'IDOR (White-box)';
+}
+if ($lidRow === 20) {
+    $lab['title'] = 'Reflected XSS (White-box)';
+}
+if ($lidRow === 21) {
+    $lab['title'] = 'DOM XSS (White-box)';
+}
+
+// White-box display: unify title/description with mapped black-box lab (e.g. lab 11 -> lab 1).
+if (is_int($mapped) && $mapped > 0) {
+    $mid = (int) $mapped;
+    $mRes = $conn->query("SELECT title, description FROM labs WHERE lab_id = $mid LIMIT 1");
+    if ($mRes && $mRes->num_rows > 0) {
+        $mrow = $mRes->fetch_assoc();
+        $mt = trim((string) ($mrow['title'] ?? ''));
+        $md = trim((string) ($mrow['description'] ?? ''));
+        if ($mt !== '') {
+            $lab['title'] = $mt;
+        }
+        if ($md !== '') {
+            $lab['description'] = $md;
+        }
+    }
+}
+
+// White-box display: unify title/description with mapped black-box lab (e.g. lab 11 -> lab 1).
+if (is_int($mapped) && $mapped > 0) {
+    $mid = (int) $mapped;
+    $mRes = $conn->query("SELECT title, description FROM labs WHERE lab_id = $mid LIMIT 1");
+    if ($mRes && $mRes->num_rows > 0) {
+        $mrow = $mRes->fetch_assoc();
+        $mt = trim((string) ($mrow['title'] ?? ''));
+        $md = trim((string) ($mrow['description'] ?? ''));
+        if ($mt !== '') {
+            $lab['title'] = $mt;
+        }
+        if ($md !== '') {
+            $lab['description'] = $md;
+        }
+    }
+}
+
+$hintsRes = $conn->query("
+    SELECT h.text
+    FROM hints h
+    INNER JOIN challenges c ON c.challenge_id = h.challenge_id
+    WHERE c.lab_id = $labId
+      AND c.is_active = 1
+    ORDER BY c.order_index ASC, h.hint_id ASC
+");
+
+$hints = [];
+if ($hintsRes) {
+    while ($h = $hintsRes->fetch_assoc()) {
+        $text = trim((string)($h['text'] ?? ''));
+        if ($text !== '') {
+            $hints[] = $text;
+        }
+    }
+}
+if ($labId === 18 || $labId === 19) {
+    $hints = [];
+}
+
+$data = [
+    'lab' => [
+        'lab_id' => (int) ($lab['lab_id'] ?? 0),
+        'title' => (string) ($lab['title'] ?? ''),
+        'description' => (string) ($lab['description'] ?? ''),
+        'icon' => (string) ($lab['icon'] ?? 'LAB'),
+        'port' => isset($lab['port']) ? (int) $lab['port'] : null,
+        'launch_path' => (string) ($lab['launch_path'] ?? ''),
+        'labtype_id' => (int) ($lab['labtype_id'] ?? 0),
+        'difficulty' => (string) ($lab['difficulty'] ?? 'easy'),
+        'points_total' => (int) ($lab['points_total'] ?? 0),
+        'is_published' => (int) ($lab['is_published'] ?? 0) === 1,
+        'visibility' => (string) ($lab['visibility'] ?? 'private'),
+        'has_solution' => (int) ($lab['has_solution'] ?? 0) === 1,
+        'hints' => $hints,
+    ],
+];
+
+if ($isMappedWhitebox && $wbState !== null) {
+    $data['lab_unregistered'] = !$wbState['lab_in_db'];
+    $data['setup_incomplete'] = $wbState['setup_incomplete'];
+    $data['scoring_allowed'] = $wbState['scoring_allowed'];
+}
+
+echo json_encode([
+    'success' => true,
+    'message' => 'OK',
+    'data' => $data,
+]);

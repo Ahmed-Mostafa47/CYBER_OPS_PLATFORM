@@ -3,7 +3,7 @@ import { Shield, Users, Database, Activity, ChevronDown, ChevronUp, UserPlus, Us
 import axios from "axios";
 import { fetchHackMeMachineIdentity } from "../../utils/hackmeIdentity";
 
-const API_BASE = "http://localhost/HackMe/server/api";
+const API_BASE = "http://localhost/HackMe/server/controllers";
 
 const AdminDashboardPage = ({
   pendingRoleRequests = [],
@@ -73,7 +73,7 @@ const AdminDashboardPage = ({
   const fetchLatestRequests = async () => {
     setIsRefreshing(true);
     try {
-      const { data } = await axios.get(`${API_BASE}/request_role.php`, {
+      const { data } = await axios.get(`${API_BASE}/users/request_role.php`, {
         params: { all: 1 },
       });
       if (data.success) {
@@ -112,7 +112,7 @@ const AdminDashboardPage = ({
   const fetchUsers = async () => {
     setLoadingUsers(true);
     try {
-      const { data } = await axios.get(`${API_BASE}/manage_users.php`, {
+      const { data } = await axios.get(`${API_BASE}/users/manage_users.php`, {
         params: {
           current_user_id: currentUser?.user_id,
         },
@@ -149,7 +149,7 @@ const AdminDashboardPage = ({
     setProcessingUserId(targetUserId);
     try {
       const auditCtx = await buildAuditContext();
-      const { data } = await axios.post(`${API_BASE}/manage_users.php`, {
+      const { data } = await axios.post(`${API_BASE}/users/manage_users.php`, {
         current_user_id: currentUser?.user_id,
         target_user_id: targetUserId,
         role_name: roleName,
@@ -176,7 +176,7 @@ const AdminDashboardPage = ({
     setProcessingUserId(targetUserId);
     try {
       const auditCtx = await buildAuditContext();
-      const { data } = await axios.put(`${API_BASE}/manage_users.php`, {
+      const { data } = await axios.put(`${API_BASE}/users/manage_users.php`, {
         current_user_id: currentUser?.user_id,
         target_user_id: targetUserId,
         role_name: roleName,
@@ -200,7 +200,7 @@ const AdminDashboardPage = ({
     setDeletingUserId(targetUserId);
     try {
       const auditCtx = await buildAuditContext();
-      const { data } = await axios.delete(`${API_BASE}/manage_users.php`, {
+      const { data } = await axios.delete(`${API_BASE}/users/manage_users.php`, {
         data: {
           current_user_id: currentUser?.user_id,
           target_user_id: targetUserId,
@@ -229,7 +229,7 @@ const AdminDashboardPage = ({
     setProcessingId(requestId);
     try {
       const auditCtx = await buildAuditContext();
-      const { data } = await axios.put(`${API_BASE}/request_role.php`, {
+      const { data } = await axios.put(`${API_BASE}/users/request_role.php`, {
         request_id: requestId,
         status: "approved",
         current_user_id: currentUser?.user_id,
@@ -256,7 +256,7 @@ const AdminDashboardPage = ({
     setProcessingId(requestId);
     try {
       const auditCtx = await buildAuditContext();
-      const { data } = await axios.put(`${API_BASE}/request_role.php`, {
+      const { data } = await axios.put(`${API_BASE}/users/request_role.php`, {
         request_id: requestId,
         status: "rejected",
         current_user_id: currentUser?.user_id,

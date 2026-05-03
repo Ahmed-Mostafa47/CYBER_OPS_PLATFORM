@@ -26,7 +26,7 @@ const LoginPage = ({ onLogin, onSwitchToRegister, onForgotPassword }) => {
         // Login should still work even if identity service is unavailable.
       }
       const response = await axios.post(
-        'http://localhost/HackMe/server/auth/login.php',
+        'http://localhost/HackMe/server/controllers/auth/login.php',
         {
           email: email,
           password: password,

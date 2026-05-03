@@ -16,7 +16,7 @@ export const getHackMeBase = () => {
   return origin + "/HackMe";
 };
 
-const getApiBase = () => getHackMeBase() + "/server/api/labs";
+const getApiBase = () => getHackMeBase() + "/server/controllers/labs";
 
 const getLabsBase = () =>
   typeof import.meta !== "undefined" && import.meta.env?.DEV
@@ -111,7 +111,7 @@ function dedupeLabsById(labs) {
 export const labService = {
   async getLabs() {
     try {
-      const response = await fetch(`${getLabsBase()}/get_labs.php`, {
+      const response = await fetch(`${getLabsBase()}/labs_api/get_labs.php`, {
         cache: "no-store",
       });
       const data = await response.json().catch(() => ({}));
@@ -206,7 +206,7 @@ export const labService = {
   async getLabDetails(labId) {
     try {
       const response = await fetch(
-        `${getLabsBase()}/get_lab_details.php?lab_id=${encodeURIComponent(labId)}`,
+        `${getLabsBase()}/labs_api/get_lab_details.php?lab_id=${encodeURIComponent(labId)}`,
         { cache: "no-store" }
       );
       const data = await response.json().catch(() => ({}));
@@ -232,7 +232,7 @@ export const labService = {
   },
 
   async getLabSolution({ labId, userId }) {
-    const response = await fetch(`${getLabsBase()}/get_solution.php`, {
+    const response = await fetch(`${getLabsBase()}/labs_api/get_solution.php`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ lab_id: labId, user_id: userId }),
@@ -246,7 +246,7 @@ export const labService = {
 
   async getWhiteboxLab({ labId, userId }) {
     const response = await fetch(
-      `${getLabsBase()}/get_whitebox_lab.php?lab_id=${encodeURIComponent(labId)}&user_id=${encodeURIComponent(userId)}`,
+      `${getLabsBase()}/labs_api/get_whitebox_lab.php?lab_id=${encodeURIComponent(labId)}&user_id=${encodeURIComponent(userId)}`,
       { cache: "no-store" }
     );
     const data = await response.json().catch(() => ({}));
@@ -258,7 +258,7 @@ export const labService = {
 
   async submitWhiteboxFix({ labId, userId, accessToken, sourceFile, line, replacementCode }) {
     const clientLocalIp = await getClientLocalIp();
-    const response = await fetch(`${getLabsBase()}/submit_whitebox_fix.php`, {
+    const response = await fetch(`${getLabsBase()}/labs_api/submit_whitebox_fix.php`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -281,7 +281,7 @@ export const labService = {
     const formData = new FormData();
     formData.append("lab_zip", file);
     formData.append("user_id", String(userId || 0));
-    const response = await fetch(`${getLabsBase()}/upload_lab_zip.php`, {
+    const response = await fetch(`${getLabsBase()}/labs_api/upload_lab_zip.php`, {
       method: "POST",
       body: formData,
     });
@@ -304,7 +304,7 @@ export const labService = {
 
   async finalizeLabUpload({ userId, uploadToken }) {
     const clientLocalIp = await getClientLocalIp();
-    const response = await fetch(`${getLabsBase()}/finalize_lab_upload.php`, {
+    const response = await fetch(`${getLabsBase()}/labs_api/finalize_lab_upload.php`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -322,7 +322,7 @@ export const labService = {
 
   async getLabDocument({ labId, kind }) {
     const response = await fetch(
-      `${getLabsBase()}/get_lab_document.php?lab_id=${encodeURIComponent(labId)}&kind=${encodeURIComponent(kind)}`,
+      `${getLabsBase()}/labs_api/get_lab_document.php?lab_id=${encodeURIComponent(labId)}&kind=${encodeURIComponent(kind)}`,
       { cache: "no-store" }
     );
     const data = await response.json().catch(() => ({}));
@@ -334,7 +334,7 @@ export const labService = {
 
   async getLabSubmissionRequests({ userId }) {
     const response = await fetch(
-      `${getLabsBase()}/get_lab_submission_requests.php?user_id=${encodeURIComponent(userId)}`,
+      `${getLabsBase()}/labs_api/get_lab_submission_requests.php?user_id=${encodeURIComponent(userId)}`,
       { cache: "no-store" }
     );
     const data = await response.json().catch(() => ({}));
@@ -346,7 +346,7 @@ export const labService = {
 
   async approveLabSubmission({ userId, submissionId }) {
     const clientLocalIp = await getClientLocalIp();
-    const response = await fetch(`${getLabsBase()}/approve_lab_submission.php`, {
+    const response = await fetch(`${getLabsBase()}/labs_api/approve_lab_submission.php`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -364,7 +364,7 @@ export const labService = {
 
   async rejectLabSubmission({ userId, submissionId }) {
     const clientLocalIp = await getClientLocalIp();
-    const response = await fetch(`${getLabsBase()}/reject_lab_submission.php`, {
+    const response = await fetch(`${getLabsBase()}/labs_api/reject_lab_submission.php`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -381,7 +381,7 @@ export const labService = {
   },
 
   async downloadLabSubmissionZip({ userId, submissionId }) {
-    const url = `${getLabsBase()}/download_lab_submission_zip.php?user_id=${encodeURIComponent(
+    const url = `${getLabsBase()}/labs_api/download_lab_submission_zip.php?user_id=${encodeURIComponent(
       userId
     )}&submission_id=${encodeURIComponent(submissionId)}`;
     const response = await fetch(url, { cache: "no-store" });
@@ -417,7 +417,7 @@ export const labService = {
     zipOriginalName,
   }) {
     const clientLocalIp = await getClientLocalIp();
-    const response = await fetch(`${getLabsBase()}/submit_lab_proposal.php`, {
+    const response = await fetch(`${getLabsBase()}/labs_api/submit_lab_proposal.php`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -442,6 +442,20 @@ export const labService = {
     return data;
   },
 
+  async getLabEditData({ userId, labId }) {
+    const response = await fetch(
+      `${getLabsBase()}/labs_api/get_lab_edit_data.php?user_id=${encodeURIComponent(
+        userId
+      )}&lab_id=${encodeURIComponent(labId)}`,
+      { cache: "no-store" }
+    );
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data?.success === false) {
+      throw new Error(data?.message || `Failed to get lab edit data (${response.status})`);
+    }
+    return data;
+  },
+
   async updateLabMetadata({
     userId,
     labId,
@@ -455,6 +469,8 @@ export const labService = {
     launchPath,
     port,
     labtypeId,
+    solution,
+    hints,
   }) {
     const clientLocalIp = await getClientLocalIp();
     const payload = {
@@ -471,10 +487,12 @@ export const labService = {
       port: port ?? null,
       client_local_ip: clientLocalIp,
     };
+    if (solution !== undefined) payload.solution = solution;
+    if (hints !== undefined) payload.hints = hints;
     if (labtypeId != null && labtypeId !== "") {
       payload.labtype_id = Number(labtypeId);
     }
-    const response = await fetch(`${getLabsBase()}/update_lab_metadata.php`, {
+    const response = await fetch(`${getLabsBase()}/labs_api/update_lab_metadata.php`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -488,7 +506,7 @@ export const labService = {
 
   async deleteLab({ userId, labId }) {
     const clientLocalIp = await getClientLocalIp();
-    const response = await fetch(`${getLabsBase()}/delete_lab.php`, {
+    const response = await fetch(`${getLabsBase()}/labs_api/delete_lab.php`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

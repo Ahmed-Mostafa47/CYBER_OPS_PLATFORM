@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { ShieldCheck, KeyRound, Award, Users, Trash2, Eye, EyeOff, AlertTriangle } from "lucide-react";
 
-const API_BASE = import.meta.env.DEV ? "/api" : "http://localhost/HackMe/server/api";
+const API_BASE = import.meta.env.DEV ? "/api" : "http://localhost/HackMe/server/controllers";
 
 const ProfilePage = ({
   currentUser,
@@ -35,7 +35,7 @@ const ProfilePage = ({
     let cancelled = false;
     const fetchPoints = async () => {
       try {
-        const res = await fetch(`${API_BASE}/get_user_points.php?user_id=${currentUser.user_id}`);
+        const res = await fetch(`${API_BASE}/users/get_user_points.php?user_id=${currentUser.user_id}`);
         const data = await res.json();
         if (!cancelled && data.success && data.total_points != null) {
           setPoints(data.total_points);

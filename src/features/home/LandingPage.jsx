@@ -4,7 +4,7 @@ import BinaryRain from '@/features/shared/ui/BinaryRain';
 import ContactUsModal from '@/features/shared/ui/ContactUsModal';
 import '@/styles/animations.css';
 
-const API_BASE = import.meta.env.DEV ? '/api' : 'http://localhost/HackMe/server/api';
+const API_BASE = import.meta.env.DEV ? '/api' : 'http://localhost/HackMe/server/controllers';
 
 const LandingPage = ({ onNavigateToLogin, onNavigateToRegister }) => {
   const [visibleElements, setVisibleElements] = useState(new Set());
@@ -72,7 +72,7 @@ const LandingPage = ({ onNavigateToLogin, onNavigateToRegister }) => {
       setChampionsLoading(true);
       setChampionsError(null);
       try {
-        const res = await fetch(`${API_BASE}/get_leaderboard.php?limit=15`);
+        const res = await fetch(`${API_BASE}/users/get_leaderboard.php?limit=15`);
         const data = await res.json();
         if (cancelled) return;
         if (data.success && Array.isArray(data.leaderboard)) {

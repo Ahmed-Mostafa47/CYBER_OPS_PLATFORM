@@ -7,12 +7,12 @@ import { io } from 'socket.io-client';
 import axios from 'axios';
 import { getHackMeBase } from './labService.js';
 
-/** Same origin rules as lab APIs: Vite dev uses /api proxy → HackMe/server/api */
+/** Same origin rules as lab APIs: Vite dev uses /api proxy → HackMe/server/controllers */
 const getNotificationsApiRoot = () => {
     if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
         return '/api';
     }
-    return `${getHackMeBase()}/server/api`;
+    return `${getHackMeBase()}/server/controllers`;
 };
 
 const SOCKET_URL = 'http://localhost:3001';
@@ -152,7 +152,7 @@ class NotificationService {
                 unread_only: options.unreadOnly ? 1 : 0,
             });
 
-            const response = await axios.get(`${getNotificationsApiRoot()}/getNotifications.php?${params}`);
+            const response = await axios.get(`${getNotificationsApiRoot()}/social/getNotifications.php?${params}`);
             return response.data;
         } catch (error) {
             console.error('[Notifications] Failed to fetch:', error);
@@ -168,7 +168,7 @@ class NotificationService {
      */
     async markAsRead(userId, notificationId = null) {
         try {
-            const response = await axios.post(`${getNotificationsApiRoot()}/markAsRead.php`, {
+            const response = await axios.post(`${getNotificationsApiRoot()}/social/markAsRead.php`, {
                 user_id: userId,
                 notification_id: notificationId,
             });

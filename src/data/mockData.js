@@ -74,7 +74,7 @@ export const mockLabs = [
     visibility: "public",
     docker_image: "",
     created_by: 1,
-    whitebox_files: ["login.php", "database_config.php", "user_management.php"],
+    whitebox_files: ["auth/login.php", "database_config.php", "user_management.php"],
     progress: 0,
     status: "NOT_STARTED",
     icon: "💉",
@@ -354,7 +354,7 @@ export const mockChallenges = [
     order_index: 1,
     max_score: 50,
     difficulty: "medium",
-    whitebox_files_ref: ["login.php"],
+    whitebox_files_ref: ["auth/login.php"],
     testcases: [
       {
         testcase_id: 1,

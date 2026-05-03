@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Activity, Search, Filter } from "lucide-react";
 import axios from "axios";
 
-const API_BASE = "http://localhost/HackMe/server/api";
+const API_BASE = "http://localhost/HackMe/server/controllers";
 
 const AttemptLogsPage = ({ currentUser }) => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -31,7 +31,7 @@ const AttemptLogsPage = ({ currentUser }) => {
       } else if (search.trim()) {
         params.search = search.trim();
       }
-      const { data } = await axios.get(`${API_BASE}/attempt_logs.php`, {
+      const { data } = await axios.get(`${API_BASE}/security/attempt_logs.php`, {
         params,
       });
       if (data?.success) {

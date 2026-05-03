@@ -99,7 +99,7 @@ const EmailVerificationPage = ({
 
     try {
       const response = await axios.post(
-        "http://localhost/HackMe/server/auth/verify_code.php",
+        "http://localhost/HackMe/server/controllers/auth/verify_code.php",
         {
           email: userEmail,
           code: verificationCode,
@@ -153,7 +153,7 @@ const EmailVerificationPage = ({
       };
 
       const response = await axios.post(
-        "http://localhost/HackMe/server/auth/send_verification.php",
+        "http://localhost/HackMe/server/controllers/auth/send_verification.php",
         requestData,
         {
           headers: { "Content-Type": "application/json" },

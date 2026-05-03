@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
-const API_BASE = import.meta.env.DEV ? "/api" : "http://localhost/HackMe/server/api";
+const API_BASE = import.meta.env.DEV ? "/api" : "http://localhost/HackMe/server/controllers";
 
 /**
  * Contact form modal that fetches SuperAdmin recipients and submits email requests.
@@ -32,7 +32,7 @@ export default function ContactUsModal({ open, onClose }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE}/contact_superadmins.php`);
+        const res = await fetch(`${API_BASE}/admin/contact_superadmins.php`);
         const raw = await res.text();
         let data = {};
         try {
@@ -92,7 +92,7 @@ export default function ContactUsModal({ open, onClose }) {
     setSubmitError("");
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE}/contact_superadmins.php`, {
+      const res = await fetch(`${API_BASE}/admin/contact_superadmins.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

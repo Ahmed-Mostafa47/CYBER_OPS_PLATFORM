@@ -57,7 +57,7 @@ const LabWhiteboxPage = ({ currentUser, onFlagSuccess }) => {
   const [solutionLoading, setSolutionLoading] = useState(false);
   const [solutionError, setSolutionError] = useState("");
 
-  const API_BASE = import.meta.env.DEV ? "/api" : "http://localhost/HackMe/server/api";
+  const API_BASE = import.meta.env.DEV ? "/api" : "http://localhost/HackMe/server/controllers";
 
   const goBack = () => {
     if (fromCategory && labType) {
@@ -103,7 +103,7 @@ const LabWhiteboxPage = ({ currentUser, onFlagSuccess }) => {
     const abort = new AbortController();
     const check = async () => {
       try {
-        const url = `${API_BASE}/labs/check_lab_solved.php?lab_id=${lab.lab_id}&user_id=${uid}&scope=whitebox`;
+        const url = `${API_BASE}/labs/labs_api/check_lab_solved.php?lab_id=${lab.lab_id}&user_id=${uid}&scope=whitebox`;
         const r = await fetch(url, { cache: "no-store", signal: abort.signal });
         const d = await r.json().catch(() => ({}));
         if (abort.signal.aborted) return;
@@ -129,7 +129,7 @@ const LabWhiteboxPage = ({ currentUser, onFlagSuccess }) => {
       setSolutionViewed(false);
       return;
     }
-    const url = `${API_BASE}/labs/resource_usage.php?lab_id=${lab.lab_id}&user_id=${uid}`;
+    const url = `${API_BASE}/labs/labs_api/resource_usage.php?lab_id=${lab.lab_id}&user_id=${uid}`;
     fetch(url, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
@@ -144,7 +144,7 @@ const LabWhiteboxPage = ({ currentUser, onFlagSuccess }) => {
     const uid = currentUser?.user_id ?? currentUser?.id;
     if (!uid || !lab?.lab_id) return;
     try {
-      await fetch(`${API_BASE}/labs/resource_usage.php`, {
+      await fetch(`${API_BASE}/labs/labs_api/resource_usage.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

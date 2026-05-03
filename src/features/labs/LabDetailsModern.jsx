@@ -18,7 +18,7 @@ import { WHITEBOX_WORKBENCH_LAB_IDS } from "../../constants/labs";
 import { fetchHackMeMachineIdentity } from "../../utils/hackmeIdentity";
 
 // Use relative path when proxy exists (dev), else full URL (production)
-const API_BASE = import.meta.env.DEV ? "/api" : "http://localhost/HackMe/server/api";
+const API_BASE = import.meta.env.DEV ? "/api" : "http://localhost/HackMe/server/controllers";
 
 /** Stable per-browser secret (real MAC is not exposed to web apps). Bound with token + IP on server. */
 function getOrCreateHackMeDeviceBind() {
@@ -180,7 +180,7 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
       if (!lab?.lab_id || (!currentUser?.user_id && !currentUser?.id)) return;
       try {
         const uid = currentUser?.user_id ?? currentUser?.id;
-        const url = `${API_BASE}/labs/check_lab_solved.php?lab_id=${lab.lab_id}&user_id=${uid}&scope=standard`;
+        const url = `${API_BASE}/labs/labs_api/check_lab_solved.php?lab_id=${lab.lab_id}&user_id=${uid}&scope=standard`;
         const r = await fetch(url, { cache: "no-store", signal: abort.signal });
         const d = await r.json().catch(() => ({}));
         if (d?.solved) {
@@ -212,7 +212,7 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
   useEffect(() => {
     const uid = currentUser?.user_id ?? currentUser?.id;
     if (!lab?.lab_id || !uid) return;
-    const url = `${API_BASE}/labs/resource_usage.php?lab_id=${lab.lab_id}&user_id=${uid}`;
+    const url = `${API_BASE}/labs/labs_api/resource_usage.php?lab_id=${lab.lab_id}&user_id=${uid}`;
     fetch(url, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
@@ -227,7 +227,7 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
     const uid = currentUser?.user_id ?? currentUser?.id;
     if (!uid || !lab?.lab_id) return;
     try {
-      await fetch(`${API_BASE}/labs/resource_usage.php`, {
+      await fetch(`${API_BASE}/labs/labs_api/resource_usage.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -254,7 +254,7 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
         const identity = await fetchHackMeMachineIdentity();
         localIp = identity?.local_ipv4 || "";
       } catch (_) {}
-      const submitUrl = import.meta.env.DEV ? "/api/submit_flag.php" : `${API_BASE}/submit_flag.php`;
+      const submitUrl = import.meta.env.DEV ? "/api/labs/submit_flag.php" : `${API_BASE}/labs/submit_flag.php`;
       const res = await fetch(submitUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -308,7 +308,7 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
       const { mac, local_ipv4: localIp } = await fetchHackMeMachineIdentity();
 
       // Start lab container before opening (runs docker-compose up -d)
-      const startRes = await fetch(`${API_BASE}/labs/start_lab_container.php`, {
+      const startRes = await fetch(`${API_BASE}/labs/labs_api/start_lab_container.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -328,7 +328,7 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
       }
 
       const deviceBind = getOrCreateHackMeDeviceBind();
-      const res = await fetch(`${API_BASE}/generate_lab_token.php`, {
+      const res = await fetch(`${API_BASE}/labs/generate_lab_token.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
