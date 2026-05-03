@@ -24,6 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 try {
     require_once __DIR__ . '/../../utils/db_connect.php';
     require_once __DIR__ . '/../../utils/labs_proposal_schema.php';
+    require_once __DIR__ . '/../../utils/lab_publish_helper.php';
     require_once __DIR__ . '/../../utils/audit_log.php';
 } catch (Throwable $e) {
     http_response_code(500);
@@ -129,25 +130,10 @@ if ($title === '' || $description === '') {
 }
 
 $labtypeId = (int) ($row['labtype_id'] ?? 1);
-if ($labtypeId < 1 || $labtypeId > 3) {
-    $labtypeId = 1;
-}
 $diffRaw = strtolower(trim((string) ($row['difficulty'] ?? 'easy')));
 $difficulty = in_array($diffRaw, ['easy', 'medium', 'hard'], true) ? $diffRaw : 'easy';
 $pointsTotal = max(0, (int) ($row['points_total'] ?? 0));
 $owaspRaw = trim((string) ($row['owasp_category'] ?? ''));
-$owaspKey = preg_replace('/[^a-zA-Z0-9_]/', '_', $owaspRaw);
-$owaspKey = substr($owaspKey, 0, 128);
-if ($owaspKey === '') {
-    $owaspKey = 'a01_broken_access_control';
-}
-
-$titleEsc = $conn->real_escape_string(substr($title, 0, 255));
-$iconEsc = $conn->real_escape_string('🧪');
-$owaspEsc = $conn->real_escape_string($owaspKey);
-$marker = '[[hackme_owasp:' . $owaspKey . "]]\n\n";
-$descPlainEsc = $conn->real_escape_string($description);
-$descWithMarkerEsc = $conn->real_escape_string($marker . $description);
 
 $conn->begin_transaction();
 try {
@@ -163,39 +149,19 @@ try {
         exit;
     }
 
-    if ($proposalColsReady) {
-        $sqlIns = "
-            INSERT INTO labs (
-                title, description, labtype_id, difficulty, points_total,
-                created_by, is_published, visibility, docker_image, reset_interval,
-                icon, port, launch_path, owasp_category_key, coming_soon
-            ) VALUES (
-                '$titleEsc', '$descPlainEsc', $labtypeId, '$difficulty', $pointsTotal,
-                $userId, 1, 'public', '', 3600,
-                '$iconEsc', NULL, '', '$owaspEsc', 1
-            )
-        ";
-    } else {
-        $sqlIns = "
-            INSERT INTO labs (
-                title, description, labtype_id, difficulty, points_total,
-                created_by, is_published, visibility, docker_image, reset_interval,
-                icon, port, launch_path
-            ) VALUES (
-                '$titleEsc', '$descWithMarkerEsc', $labtypeId, '$difficulty', $pointsTotal,
-                $userId, 1, 'public', '', 3600,
-                '$iconEsc', NULL, '__HACKME_SOON__'
-            )
-        ";
-    }
-    $ins = $conn->query($sqlIns);
-    if ($ins !== true) {
-        $conn->rollback();
-        http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Failed to create lab row: ' . ($conn->error ?: 'DB error')]);
-        exit;
-    }
-    $newLabId = (int) $conn->insert_id;
+    $published = hackme_insert_lab_catalog_card_from_proposal_fields(
+        $conn,
+        $proposalColsReady,
+        $userId,
+        $title,
+        $description,
+        $labtypeId,
+        $difficulty,
+        $pointsTotal,
+        $owaspRaw
+    );
+    $newLabId = $published['lab_id'];
+    $owaspKey = $published['owasp_category_key'];
     $conn->commit();
 } catch (Throwable $e) {
     try {

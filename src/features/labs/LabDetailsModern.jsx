@@ -394,32 +394,68 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
 
   if (whiteboxRouteLabIds.has(Number(labId))) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black flex items-center justify-center">
-        <p className="text-slate-400 font-mono text-sm">Opening white-box workspace…</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black px-4 sm:px-6 lg:px-10 pt-24 pb-16 scroll-pt-24">
+        <div className="max-w-6xl mx-auto flex flex-col items-center justify-center min-h-[40vh] gap-6">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="self-start inline-flex items-center gap-2 text-xs sm:text-sm font-mono text-slate-400 hover:text-emerald-300 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" aria-hidden />
+              BACK_TO_LABS
+            </button>
+          )}
+          <p className="text-slate-400 font-mono text-sm text-center">Opening white-box workspace…</p>
+        </div>
       </div>
     );
   }
 
   if (labLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black flex items-center justify-center">
-        <p className="text-slate-400 font-mono text-sm">Loading lab...</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black px-4 sm:px-6 lg:px-10 pt-24 pb-16 scroll-pt-24">
+        <div className="max-w-6xl mx-auto">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="mb-10 inline-flex items-center gap-2 text-xs sm:text-sm font-mono text-slate-400 hover:text-emerald-300 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" aria-hidden />
+              BACK_TO_LABS
+            </button>
+          )}
+          <div className="flex justify-center py-20">
+            <p className="text-slate-400 font-mono text-sm">Loading lab...</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!lab || labError) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black flex items-center justify-center px-6">
-        <p className="text-rose-300 font-mono text-sm">
-          {labError || "Lab not found."}
-        </p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black px-4 sm:px-6 lg:px-10 pt-24 pb-16 scroll-pt-24">
+        <div className="max-w-6xl mx-auto flex flex-col items-center gap-6 text-center">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="self-start inline-flex items-center gap-2 text-xs sm:text-sm font-mono text-slate-400 hover:text-emerald-300 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" aria-hidden />
+              BACK_TO_LABS
+            </button>
+          )}
+          <p className="text-rose-300 font-mono text-sm max-w-lg">{labError || "Lab not found."}</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black py-12 px-4 sm:px-6 lg:px-10">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black pt-24 pb-16 scroll-pt-24 px-4 sm:px-6 lg:px-10">
       {/* Success toast - slides down from below navbar, then fades out after 3s */}
       {successPopupVisible && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4 animate-slide-down">
@@ -443,10 +479,11 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
           <div className="space-y-4">
             {onBack && (
               <button
+                type="button"
                 onClick={onBack}
-                className="inline-flex items-center gap-2 text-xs sm:text-sm font-mono text-slate-400 hover:text-emerald-300 transition-colors"
+                className="inline-flex items-center gap-2 text-xs sm:text-sm font-mono text-slate-400 hover:text-emerald-300 transition-colors pt-0.5"
               >
-                <ArrowLeft className="w-4 h-4" />
+                <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden />
                 BACK_TO_LABS
               </button>
             )}

@@ -114,6 +114,16 @@ if (!$rolesRes || $rolesRes->num_rows === 0) {
     exit;
 }
 
+$elevatedRes = $conn->query("
+  SELECT 1
+  FROM user_roles ur
+  INNER JOIN roles r ON r.role_id = ur.role_id
+  WHERE ur.user_id = $userId
+    AND LOWER(r.name) IN ('admin','superadmin')
+  LIMIT 1
+");
+$isAdminOrSuper = $elevatedRes && $elevatedRes->num_rows > 0;
+
 $title = trim((string) ($input['title'] ?? ''));
 $description = trim((string) ($input['description'] ?? ''));
 $labtypeId = (int) ($input['labtype_id'] ?? 1);
@@ -153,6 +163,86 @@ if ($pointsTotal < 0 || $pointsTotal > 10000) {
 if (mb_strlen($owaspCategory) > 80) {
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => 'Invalid owasp_category']);
+    exit;
+}
+
+if ($uploadToken === '' || !preg_match('/^[a-f0-9]{32}$/', $uploadToken)) {
+    http_response_code(400);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Validated lab archive required. Upload a ZIP/RAR, click Validate, then submit.',
+    ]);
+    exit;
+}
+if (hackme_load_staged_manifest($uploadToken) === null) {
+    http_response_code(400);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Upload session expired or invalid — validate your archive again before submitting.',
+    ]);
+    exit;
+}
+
+if ($isAdminOrSuper) {
+    try {
+        require_once __DIR__ . '/../../utils/labs_proposal_schema.php';
+        require_once __DIR__ . '/../../utils/lab_publish_helper.php';
+    } catch (Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Load error']);
+        exit;
+    }
+    $proposalColsReady = hackme_ensure_labs_proposal_columns($conn);
+    $conn->begin_transaction();
+    try {
+        $published = hackme_insert_lab_catalog_card_from_proposal_fields(
+            $conn,
+            $proposalColsReady,
+            $userId,
+            $title,
+            $description,
+            $labtypeId,
+            $difficulty,
+            $pointsTotal,
+            $owaspCategory
+        );
+        $conn->commit();
+    } catch (Throwable $e) {
+        try {
+            $conn->rollback();
+        } catch (Throwable) {
+        }
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Failed to publish lab']);
+        exit;
+    }
+
+    hackme_write_audit_log($conn, [
+        'actor_user_id' => $userId,
+        'actor_username' => $actorUsername,
+        'action' => 'lab_direct_publish',
+        'status' => 'success',
+        'details' => json_encode([
+            'lab_id' => $published['lab_id'],
+            'title' => $title,
+            'labtype_id' => $labtypeId,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        'ip_address' => hackme_client_ip(),
+        'client_local_ip' => $clientLocalIp,
+        'user_agent' => (string) ($_SERVER['HTTP_USER_AGENT'] ?? ''),
+    ]);
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Lab published to the catalog (no approval request).',
+        'data' => [
+            'lab_id' => $published['lab_id'],
+            'direct_publish' => true,
+            'owasp_category_key' => $published['owasp_category_key'],
+            'zip_packaged' => false,
+            'notified_count' => 0,
+        ],
+    ]);
     exit;
 }
 

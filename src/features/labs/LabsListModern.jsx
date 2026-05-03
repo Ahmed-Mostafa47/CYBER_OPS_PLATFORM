@@ -127,13 +127,23 @@ const LabsListModern = ({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black py-16 px-4 sm:px-6 lg:px-10">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black px-4 sm:px-6 lg:px-10 pt-24 pb-16 scroll-pt-24">
       <div className="max-w-7xl mx-auto">
+        {onBack && (
+          <div className="mb-8 pt-1">
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center gap-2 text-sm font-mono text-slate-400 hover:text-emerald-400 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" aria-hidden />
+              BACK TO CATEGORIES
+            </button>
+          </div>
+        )}
         {/* HEADER */}
         <header className="mb-12 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
           <div>
-            <br />
-            <br />
             <p className="text-xs sm:text-sm text-emerald-400 font-mono tracking-[0.2em] uppercase">
               // LABS_SYSTEM
             </p>
@@ -170,16 +180,6 @@ const LabsListModern = ({
             )}
           </div>
         </header>
-
-        {onBack && (
-          <button
-            onClick={onBack}
-            className="inline-flex items-center gap-2 text-sm font-mono text-slate-400 hover:text-emerald-400 transition-colors mb-8"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            BACK TO CATEGORIES
-          </button>
-        )}
 
         {loading ? (
           <div className="flex justify-center py-16">

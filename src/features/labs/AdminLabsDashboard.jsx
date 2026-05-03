@@ -273,21 +273,26 @@ const AdminLabsDashboard = () => {
                     </div>
                   )}
                   <div className="flex flex-wrap gap-2 pt-1">
-                    {req.has_zip_package ? (
-                      <button
-                        type="button"
-                        disabled={zipDownloadId != null || proposalActionId != null}
-                        onClick={() => handleDownloadSubmissionZip(req)}
-                        className="inline-flex items-center gap-2 rounded-lg bg-cyan-500/15 border border-cyan-400/60 px-3 py-1.5 text-[11px] font-mono text-cyan-100 hover:bg-cyan-500/25 transition-colors disabled:opacity-50"
-                      >
-                        {zipDownloadId === req.submission_id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Download className="w-3.5 h-3.5" />
-                        )}
-                        Download ZIP
-                      </button>
-                    ) : null}
+                    <button
+                      type="button"
+                      title={
+                        req.has_zip_package
+                          ? "Download the instructor’s uploaded package as a ZIP"
+                          : "No uploaded package for this proposal — instructor did not attach a validated ZIP / files folder"
+                      }
+                      disabled={
+                        !req.has_zip_package || zipDownloadId != null || proposalActionId != null
+                      }
+                      onClick={() => handleDownloadSubmissionZip(req)}
+                      className="inline-flex items-center gap-2 rounded-lg bg-cyan-500/15 border border-cyan-400/60 px-3 py-1.5 text-[11px] font-mono text-cyan-100 hover:bg-cyan-500/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {zipDownloadId === req.submission_id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Download className="w-3.5 h-3.5" />
+                      )}
+                      Download ZIP
+                    </button>
                     <button
                       type="button"
                       disabled={proposalActionId != null}
