@@ -104,9 +104,21 @@ const LabsCategoriesPage = ({
         : "BLACK_BOX";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black py-16 px-4 sm:px-6 lg:px-10">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black px-4 sm:px-6 lg:px-10 pt-24 pb-16 scroll-pt-24">
       <div className="max-w-5xl mx-auto">
-        <header className="mb-12 pt-6">
+        {onBack && (
+          <div className="mb-8 pt-1">
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center gap-2 text-sm font-mono text-slate-400 hover:text-emerald-400 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" aria-hidden />
+              BACK
+            </button>
+          </div>
+        )}
+        <header className="mb-12">
           <p className="text-xs sm:text-sm text-emerald-400 font-mono tracking-[0.2em] uppercase">
             // LAB_FOLDERS
           </p>
@@ -120,19 +132,6 @@ const LabsCategoriesPage = ({
             <span className="text-slate-300">grid view</span> for the full card layout.
           </p>
         </header>
-
-        {onBack && (
-          <div className="mb-8 flex items-center gap-4">
-            <button
-              type="button"
-              onClick={onBack}
-              className="inline-flex items-center gap-2 text-sm font-mono text-slate-400 hover:text-emerald-400 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              BACK
-            </button>
-          </div>
-        )}
 
         {loading ? (
           <div className="flex justify-center py-16">

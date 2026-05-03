@@ -34,9 +34,13 @@ const LabWhiteboxPage = ({ currentUser, onFlagSuccess }) => {
 
   useEffect(() => {
     if (!isWhiteboxWorkbench) {
-      navigate(`/lab-modern?labId=${encodeURIComponent(String(labId))}`, { replace: true });
+      const q = new URLSearchParams();
+      q.set("labId", String(labId));
+      if (fromCategory) q.set("fromCategory", fromCategory);
+      if (labType) q.set("labType", labType);
+      navigate(`/lab-modern?${q.toString()}`, { replace: true });
     }
-  }, [isWhiteboxWorkbench, labId, navigate]);
+  }, [isWhiteboxWorkbench, labId, navigate, fromCategory, labType]);
 
   const [lab, setLab] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -187,29 +191,44 @@ const LabWhiteboxPage = ({ currentUser, onFlagSuccess }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black flex items-center justify-center">
-        <p className="text-slate-400 font-mono text-sm">Loading white-box lab…</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black px-4 sm:px-6 lg:px-10 pt-24 pb-16 scroll-pt-24">
+        <div className="max-w-6xl mx-auto">
+          <button
+            type="button"
+            onClick={goBack}
+            className="mb-10 inline-flex items-center gap-2 text-xs sm:text-sm font-mono text-slate-400 hover:text-emerald-300 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden />
+            BACK
+          </button>
+          <div className="flex justify-center py-20">
+            <p className="text-slate-400 font-mono text-sm">Loading white-box lab…</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (error || !lab) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black flex flex-col items-center justify-center gap-4 px-6">
-        <p className="text-rose-300 font-mono text-sm">{error || "Lab not found."}</p>
-        <button
-          type="button"
-          onClick={goBack}
-          className="text-xs font-mono text-emerald-400 hover:underline"
-        >
-          Back
-        </button>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black px-4 sm:px-6 lg:px-10 pt-24 pb-16 scroll-pt-24">
+        <div className="max-w-6xl mx-auto flex flex-col items-start gap-6">
+          <button
+            type="button"
+            onClick={goBack}
+            className="inline-flex items-center gap-2 text-xs sm:text-sm font-mono text-slate-400 hover:text-emerald-300 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden />
+            BACK
+          </button>
+          <p className="text-rose-300 font-mono text-sm">{error || "Lab not found."}</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black py-8 px-4 sm:px-6 lg:px-10">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black pt-24 pb-16 scroll-pt-24 px-4 sm:px-6 lg:px-10">
       {successPopupVisible && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4 animate-slide-down">
           <div className="flex items-center gap-3 rounded-xl border border-emerald-500/50 bg-slate-900/95 backdrop-blur-sm px-5 py-4 shadow-2xl shadow-emerald-500/20">
@@ -231,10 +250,10 @@ const LabWhiteboxPage = ({ currentUser, onFlagSuccess }) => {
         <button
           type="button"
           onClick={goBack}
-          className="inline-flex items-center gap-2 text-xs font-mono text-slate-400 hover:text-emerald-300"
+          className="inline-flex items-center gap-2 text-xs sm:text-sm font-mono text-slate-400 hover:text-emerald-300 transition-colors pt-0.5"
         >
-          <ArrowLeft className="w-4 h-4" />
-          BACK
+          <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden />
+          BACK_TO_LABS
         </button>
 
         <header className="rounded-2xl border border-emerald-500/30 bg-slate-900/60 p-6 shadow-lg shadow-emerald-900/20">

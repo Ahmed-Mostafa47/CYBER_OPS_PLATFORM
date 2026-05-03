@@ -287,7 +287,17 @@ export const labService = {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data?.success) {
-      throw new Error(data?.message || `Failed to upload ZIP (${response.status})`);
+      const detail = data?.data?.detail ? ` (${String(data.data.detail)})` : "";
+      const validationErrors = Array.isArray(data?.data?.errors) ? data.data.errors : [];
+      const validationWarnings = Array.isArray(data?.data?.warnings) ? data.data.warnings : [];
+      const base = data?.message || `Failed to upload archive (${response.status})`;
+      const extra =
+        validationErrors.length > 0
+          ? `: ${validationErrors.join(" · ")}`
+          : validationWarnings.length > 0
+            ? ` (${validationWarnings.join(" · ")})`
+            : "";
+      throw new Error(base + extra + detail);
     }
     return data;
   },

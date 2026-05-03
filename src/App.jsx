@@ -876,7 +876,7 @@ function AppContent() {
         );
       case "/instructor-labs":
         if (!isInstructor && !isAdmin) return <HomePage setCurrentPage={(p) => navigate(`/${p}`)} />;
-        return <InstructorLabsDashboard />;
+        return <InstructorLabsDashboard isAdmin={isAdmin} />;
       case "/admin":
         if (!isAdmin && !isSuperAdmin) return <HomePage setCurrentPage={(p) => navigate(`/${p}`)} />;
         return (

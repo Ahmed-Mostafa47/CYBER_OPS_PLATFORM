@@ -3,6 +3,7 @@ import {
   Plus,
   Upload,
   FileArchive,
+  FolderTree,
   AlertTriangle,
   CheckCircle2,
   XCircle,
@@ -37,7 +38,7 @@ const statusColors = {
     "bg-rose-500/10 text-rose-300 border-rose-400/50 shadow-rose-500/20",
 };
 
-const InstructorLabsDashboard = () => {
+const InstructorLabsDashboard = ({ isAdmin = false }) => {
   const [labs, setLabs] = useState([]);
   const [labsError, setLabsError] = useState("");
   const [form, setForm] = useState(buildInitialForm);
@@ -51,6 +52,8 @@ const InstructorLabsDashboard = () => {
   const [zipResult, setZipResult] = useState(null);
   const [zipError, setZipError] = useState("");
   const [proposalZipAttached, setProposalZipAttached] = useState(false);
+  const [submitResultKind, setSubmitResultKind] = useState(null);
+  const [directPublishLabId, setDirectPublishLabId] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
@@ -99,12 +102,20 @@ const InstructorLabsDashboard = () => {
     e.preventDefault();
     setSubmitError("");
     setSubmitSuccess(false);
+    setSubmitResultKind(null);
+    setDirectPublishLabId(null);
     if (!currentUserId) {
       setSubmitError("Missing logged-in user id.");
       return false;
     }
     if (!form.title.trim() || !form.description.trim()) {
       setSubmitError("Title and description are required.");
+      return false;
+    }
+    if (!zipResult?.upload_token) {
+      setSubmitError(
+        "Validate your lab archive first: pick a .zip or .rar above, then click Validate (green area). Submit stays locked until validation succeeds."
+      );
       return false;
     }
     setSubmitLoading(true);
@@ -124,11 +135,22 @@ const InstructorLabsDashboard = () => {
         uploadToken: zipResult?.upload_token || "",
         zipOriginalName: zipFile?.name || "",
       });
-      setProposalZipAttached(!!res?.data?.zip_packaged);
+      const direct = !!res?.data?.direct_publish;
+      setProposalZipAttached(!!res?.data?.zip_packaged && !direct);
+      setSubmitResultKind(direct ? "direct" : "request");
+      setDirectPublishLabId(direct && res?.data?.lab_id ? Number(res.data.lab_id) : null);
       setSubmitSuccess(true);
       setForm(buildInitialForm());
       setZipResult(null);
       setZipFile(null);
+      if (direct) {
+        try {
+          const fresh = await labService.getLabs();
+          setLabs(fresh?.data?.labs || []);
+        } catch {
+          /* ignore */
+        }
+      }
       return true;
     } catch (err) {
       setSubmitError(err?.message || "Submit failed.");
@@ -145,9 +167,10 @@ const InstructorLabsDashboard = () => {
       setZipFile(null);
       return;
     }
-    if (!file.name.toLowerCase().endsWith(".zip")) {
+    const lower = file.name.toLowerCase();
+    if (!lower.endsWith(".zip") && !lower.endsWith(".rar")) {
       setZipFile(null);
-      setZipError("Only .zip files are accepted.");
+      setZipError("Only .zip or .rar files are accepted.");
       return;
     }
     if (file.size > 20 * 1024 * 1024) {
@@ -174,7 +197,7 @@ const InstructorLabsDashboard = () => {
       const res = await labService.uploadLabZip({ file: zipFile, userId: currentUserId });
       setZipResult(res?.data || null);
     } catch (err) {
-      setZipError(err?.message || "ZIP validation failed.");
+      setZipError(err?.message || "Archive validation failed.");
     } finally {
       setUploadingZip(false);
     }
@@ -197,7 +220,12 @@ const InstructorLabsDashboard = () => {
         uploadToken: zipResult.upload_token,
       });
       const labId = done?.data?.lab_id;
-      setZipResult((prev) => ({ ...(prev || {}), finalized_lab_id: labId }));
+      setZipResult((prev) => {
+        const next = { ...(prev || {}) };
+        delete next.upload_token;
+        next.finalized_lab_id = labId;
+        return next;
+      });
       setZipFile(null);
       // refresh list
       const fresh = await labService.getLabs();
@@ -309,6 +337,8 @@ const InstructorLabsDashboard = () => {
               onClick={() => {
                 setSubmitError("");
                 setSubmitSuccess(false);
+                setSubmitResultKind(null);
+                setDirectPublishLabId(null);
                 setIsModalOpen(true);
               }}
               className="w-full md:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2.5 text-xs sm:text-sm font-mono font-semibold text-slate-950 shadow-lg shadow-emerald-500/40 hover:from-emerald-400 hover:to-emerald-500 transition-all"
@@ -336,14 +366,90 @@ const InstructorLabsDashboard = () => {
             </div>
 
             <div className="rounded-xl border border-slate-700/80 bg-slate-900/70 p-4 mb-5 space-y-4">
+              <div className="rounded-lg border border-cyan-800/50 bg-slate-950/80 p-4 shadow-inner shadow-black/20">
+                <div className="flex items-start gap-2 mb-2">
+                  <FolderTree className="w-4 h-4 text-cyan-300 shrink-0 mt-0.5" aria-hidden />
+                  <div>
+                    <h3 className="text-xs font-mono font-semibold text-cyan-200 tracking-wide">
+                      Expected archive layout (.zip or .rar — check before uploading)
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-mono mt-1 leading-relaxed">
+                      Put real lab files under <span className="text-slate-300">lab-files/</span> (name is not
+                      case-sensitive). Optional <span className="text-slate-300">metadata.json</span> at the same level
+                      as <span className="text-slate-300">lab-files/</span> in each layout.{" "}
+                      <span className="text-slate-600">
+                        RAR needs the PHP <span className="text-slate-400">rar</span> extension on the server.
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 mt-3">
+                  <div className="rounded-md border border-slate-700/80 bg-slate-900/90 p-3">
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-2">
+                      Option A — lab-files at ZIP root
+                    </p>
+                    <pre
+                      className="text-[11px] font-mono leading-relaxed text-emerald-200/95 whitespace-pre-wrap break-all"
+                      dir="ltr"
+                    >
+{`your-lab.zip   (or .rar)
+├── lab-files/
+│   ├── index.html
+│   ├── app.js
+│   └── …
+└── metadata.json   ← optional`}
+                    </pre>
+                  </div>
+                  <div className="rounded-md border border-slate-700/80 bg-slate-900/90 p-3">
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-2">
+                      Option B — one parent folder
+                    </p>
+                    <pre
+                      className="text-[11px] font-mono leading-relaxed text-emerald-200/95 whitespace-pre-wrap break-all"
+                      dir="ltr"
+                    >
+{`your-lab.zip   (or .rar)
+└── MyLab/
+    ├── lab-files/
+    │   ├── index.html
+    │   └── …
+    └── metadata.json   ← optional`}
+                    </pre>
+                  </div>
+                </div>
+                <details className="mt-3 rounded-md border border-slate-700/60 bg-slate-900/50 px-3 py-2">
+                  <summary className="text-[11px] font-mono text-slate-400 cursor-pointer select-none marker:text-slate-500">
+                    metadata.json fields (if you include it)
+                  </summary>
+                  <pre
+                    className="mt-2 text-[10px] font-mono text-slate-400 leading-relaxed overflow-x-auto border-t border-slate-800 pt-2"
+                    dir="ltr"
+                  >
+{`{
+  "title": "My lab title",
+  "difficulty": "easy",
+  "category": "Injection",
+  "type": "whitebox"
+}`}
+                  </pre>
+                </details>
+              </div>
+
               <p className="text-[11px] text-slate-500 font-mono leading-relaxed">
-                Validate a ZIP here first; when you submit an <span className="text-slate-300">Add Lab</span> proposal
-                (form below or modal), the same validated package is attached for admins to download.
+                Validate a ZIP here first; when you submit an <span className="text-slate-300">Add Lab</span>{" "}
+                {isAdmin ? (
+                  <>as admin the lab card is published immediately (ZIP preview is not sent to an approval queue — use Save Lab Package for files).</>
+                ) : (
+                  <>
+                    proposal (form below or modal), the same validated package is attached for admins to download.
+                  </>
+                )}
               </p>
-              <div className="flex items-center gap-2 text-xs font-mono text-slate-300">
-                <FileArchive className="w-4 h-4 text-emerald-300" />
-                ZIP Package Required Structure:
-                <span className="text-slate-500">lab-files/ only (metadata/PDFs optional)</span>
+              <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+                <FileArchive className="w-4 h-4 text-emerald-300 shrink-0" />
+                <span>
+                  Max 20 MB · .zip or .rar · allowed extensions inside lab-files include php, js, html, css, json, …
+                </span>
               </div>
               <label
                 className="block rounded-xl border-2 border-dashed border-slate-600 hover:border-emerald-400/70 transition-colors p-5 cursor-pointer bg-slate-900/40"
@@ -356,7 +462,7 @@ const InstructorLabsDashboard = () => {
               >
                 <input
                   type="file"
-                  accept=".zip,application/zip,application/x-zip-compressed"
+                  accept=".zip,.rar,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/vnd.rar"
                   className="hidden"
                   onChange={(e) => onZipPicked(e.target.files?.[0] || null)}
                 />
@@ -364,7 +470,7 @@ const InstructorLabsDashboard = () => {
                   <Upload className="w-5 h-5 text-emerald-300" />
                   <div className="text-xs font-mono">
                     <p className="text-slate-200">Drag and drop ZIP here, or click to choose</p>
-                    <p className="text-slate-500 mt-1">Max size: 20MB, extension: .zip only</p>
+                    <p className="text-slate-500 mt-1">Max size: 20MB · .zip or .rar</p>
                     {zipFile && <p className="text-emerald-300 mt-1">Selected: {zipFile.name}</p>}
                   </div>
                 </div>
@@ -426,12 +532,23 @@ const InstructorLabsDashboard = () => {
               )}
               {submitSuccess && (
                 <div className="rounded-lg border border-emerald-600/60 bg-emerald-500/10 px-3 py-2 text-xs font-mono text-emerald-200 space-y-1">
-                  <p>Proposal saved. Administrators were notified (in-app).</p>
-                  {proposalZipAttached ? (
-                    <p className="text-emerald-300/95">
-                      Validated ZIP was copied for admins — they can download it from Admin Labs.
-                    </p>
-                  ) : null}
+                  {submitResultKind === "direct" ? (
+                    <>
+                      <p>Lab published to the catalog immediately (no approval request).</p>
+                      {directPublishLabId ? (
+                        <p className="text-emerald-300/95">New lab ID: {directPublishLabId}</p>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <p>Proposal saved. Administrators were notified (in-app).</p>
+                      {proposalZipAttached ? (
+                        <p className="text-emerald-300/95">
+                          Validated ZIP was copied for admins — they can download it from Admin Labs.
+                        </p>
+                      ) : null}
+                    </>
+                  )}
                 </div>
               )}
               <div>
@@ -568,14 +685,20 @@ const InstructorLabsDashboard = () => {
                 />
               </div>
 
+              {!zipResult?.upload_token ? (
+                <p className="text-[11px] font-mono text-amber-200/90 border border-amber-500/30 rounded-lg bg-amber-500/5 px-3 py-2">
+                  Add Lab submit is locked until you <span className="text-amber-100">Validate</span> an archive
+                  above (you must see &quot;Validation passed&quot; with a live upload session).
+                </p>
+              ) : null}
               <div className="pt-2 flex justify-end">
                 <button
                   type="submit"
-                  disabled={submitLoading}
+                  disabled={submitLoading || !zipResult?.upload_token}
                   className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2 text-xs sm:text-sm font-mono font-semibold text-slate-950 shadow-lg shadow-emerald-500/40 hover:from-emerald-400 hover:to-emerald-500 transition-all disabled:opacity-50 disabled:pointer-events-none"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  {submitLoading ? "Submitting…" : "Submit Lab for Approval"}
+                  {submitLoading ? "Submitting…" : isAdmin ? "Publish Lab Now" : "Submit Lab for Approval"}
                 </button>
               </div>
             </form>
@@ -682,8 +805,9 @@ const InstructorLabsDashboard = () => {
                       Add New Lab
                     </h2>
                     <p className="text-[11px] text-slate-400 font-mono">
-                      Saved to DB; admins get a notification. If you validated a ZIP on this page first, it is sent with
-                      the proposal.
+                      {isAdmin
+                        ? "Validate an archive on this page first — then submit unlocks. As admin, publish is immediate (no approval queue); use Save Lab Package for file storage."
+                        : "Validate an archive on this page first — then submit unlocks. Request goes to admins with the validated package when you submit."}
                     </p>
                   </div>
                 </div>
@@ -710,12 +834,23 @@ const InstructorLabsDashboard = () => {
                 )}
                 {submitSuccess && (
                   <div className="rounded-lg border border-emerald-600/60 bg-emerald-500/10 px-3 py-2 text-xs font-mono text-emerald-200 space-y-1">
-                    <p>Proposal saved. Administrators were notified.</p>
-                    {proposalZipAttached ? (
-                      <p className="text-emerald-300/95">
-                        ZIP attached for admin download (Admin Labs → lab proposals).
-                      </p>
-                    ) : null}
+                    {submitResultKind === "direct" ? (
+                      <>
+                        <p>Lab published to the catalog immediately (no approval request).</p>
+                        {directPublishLabId ? (
+                          <p className="text-emerald-300/95">New lab ID: {directPublishLabId}</p>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                        <p>Proposal saved. Administrators were notified.</p>
+                        {proposalZipAttached ? (
+                          <p className="text-emerald-300/95">
+                            ZIP attached for admin download (Admin Labs → lab proposals).
+                          </p>
+                        ) : null}
+                      </>
+                    )}
                   </div>
                 )}
                 <div>
@@ -855,6 +990,12 @@ const InstructorLabsDashboard = () => {
                   />
                 </div>
 
+                {!zipResult?.upload_token ? (
+                  <p className="text-[11px] font-mono text-amber-200/90 border border-amber-500/30 rounded-lg bg-amber-500/5 px-3 py-2">
+                    Close this dialog and use <span className="text-amber-100">Validate</span> on the main page first —
+                    submit stays locked until validation succeeds.
+                  </p>
+                ) : null}
                 <div className="pt-2 flex flex-col sm:flex-row sm:justify-end gap-2">
                   <button
                     type="button"
@@ -866,11 +1007,11 @@ const InstructorLabsDashboard = () => {
                   </button>
                   <button
                     type="submit"
-                    disabled={submitLoading}
+                    disabled={submitLoading || !zipResult?.upload_token}
                     className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2 text-xs sm:text-sm font-mono font-semibold text-slate-950 shadow-lg shadow-emerald-500/40 hover:from-emerald-400 hover:to-emerald-500 transition-all disabled:opacity-50 disabled:pointer-events-none"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    {submitLoading ? "Submitting…" : "Submit Lab"}
+                    {submitLoading ? "Submitting…" : isAdmin ? "Publish Lab Now" : "Submit Lab"}
                   </button>
                 </div>
               </form>
