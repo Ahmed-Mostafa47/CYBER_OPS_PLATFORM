@@ -63,6 +63,8 @@ const LabsListModern = ({
     icon: "",
     launch_path: "",
     port: "",
+    hints: "",
+    solution: "",
   });
 
   useEffect(() => {
@@ -109,6 +111,7 @@ const LabsListModern = ({
     return true;
   });
   const canAddLab =
+    !category &&
     (labType === LAB_TYPES.WHITE_BOX || labType === LAB_TYPES.BLACK_BOX) &&
     (isAdmin || isInstructor);
   const currentUserId = getStoredUserId();
@@ -261,7 +264,7 @@ const LabsListModern = ({
                 <div className="mt-4 flex flex-col sm:flex-row sm:justify-end gap-2">
                   <button
                     type="button"
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
                       setEditError("");
                       setEditForm({
@@ -276,9 +279,28 @@ const LabsListModern = ({
                         icon: String(lab.icon || ""),
                         launch_path: String(lab.launch_path || ""),
                         port: lab.port != null ? String(lab.port) : "",
+                        hints: "",
+                        solution: "",
                       });
                       setEditOpen(true);
                       onEditLab && onEditLab(lab);
+                      if (!currentUserId) return;
+                      setEditSaving(true);
+                      try {
+                        const res = await labService.getLabEditData({ userId: currentUserId, labId: lab.lab_id });
+                        const detailedLab = res?.data?.lab;
+                        if (detailedLab) {
+                          setEditForm((prev) => ({
+                            ...prev,
+                            solution: detailedLab.solution || "",
+                            hints: (detailedLab.hints || []).join("\n"),
+                          }));
+                        }
+                      } catch (err) {
+                        setEditError(err?.message || "Failed to load hints/solution.");
+                      } finally {
+                        setEditSaving(false);
+                      }
                     }}
                     className="inline-flex items-center justify-center gap-1.5 rounded-lg 
                     border border-slate-600 bg-slate-800/80 
@@ -360,6 +382,8 @@ const LabsListModern = ({
                     launchPath: editForm.launch_path,
                     port: editForm.port === "" ? null : Number(editForm.port),
                     labtypeId: editForm.labtype_id,
+                    solution: editForm.solution,
+                    hints: editForm.hints.split("\n").map((h) => h.trim()).filter(Boolean),
                   });
                   const updated = res?.data?.lab;
                   if (updated?.lab_id) {
@@ -473,16 +497,34 @@ const LabsListModern = ({
                     value={editForm.port}
                     onChange={(e) => setEditForm((f) => ({ ...f, port: e.target.value }))}
                   />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-slate-400 mb-1.5">Launch Path</label>
+                    <input
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400"
+                      value={editForm.launch_path}
+                      onChange={(e) => setEditForm((f) => ({ ...f, launch_path: e.target.value }))}
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1.5">Launch Path</label>
-                  <input
-                    className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400"
-                    value={editForm.launch_path}
-                    onChange={(e) => setEditForm((f) => ({ ...f, launch_path: e.target.value }))}
+                  <label className="block text-xs font-mono text-slate-400 mb-1.5">Hints (one per line)</label>
+                  <textarea
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400 min-h-[70px]"
+                    value={editForm.hints}
+                    onChange={(e) => setEditForm((f) => ({ ...f, hints: e.target.value }))}
+                    placeholder="Hint 1\nHint 2"
                   />
                 </div>
-              </div>
+                <div>
+                  <label className="block text-xs font-mono text-slate-400 mb-1.5">Solution</label>
+                  <textarea
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400 min-h-[90px]"
+                    value={editForm.solution}
+                    onChange={(e) => setEditForm((f) => ({ ...f, solution: e.target.value }))}
+                    placeholder="Detailed walkthrough of the intended solution."
+                  />
+                </div>
               <div className="pt-2 flex flex-col sm:flex-row sm:justify-end gap-2">
                 <button
                   type="button"

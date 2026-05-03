@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Activity, Search, Filter } from "lucide-react";
 import axios from "axios";
 
-const API_BASE = "http://localhost/HackMe/server/api";
+const API_BASE = "http://localhost/HackMe/server/controllers";
 
 const AuditLogsPage = ({ currentUser }) => {
   const [logs, setLogs] = useState([]);
@@ -16,7 +16,7 @@ const AuditLogsPage = ({ currentUser }) => {
     setLoading(true);
     setError("");
     try {
-      const { data } = await axios.get(`${API_BASE}/audit_logs.php`, {
+      const { data } = await axios.get(`${API_BASE}/security/audit_logs.php`, {
         params: {
           current_user_id: currentUser?.user_id ?? currentUser?.id,
           action: actionFilter || undefined,

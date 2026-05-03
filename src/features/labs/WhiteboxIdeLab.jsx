@@ -168,7 +168,7 @@ const WhiteboxIdeLab = ({
           <p className="mt-2 text-[11px] text-slate-500 font-mono">
             Check that <code className="text-slate-400">LABS_BASE_PATH</code> in{" "}
             <code className="text-slate-400">server/utils/labs_config.php</code> points to your Training Labs root (e.g.{" "}
-            <code className="text-slate-400">SQL/api/login.php</code> for SQL white-box, or <code className="text-slate-400">BA/</code>{" "}
+            <code className="text-slate-400">SQL/api/auth/login.php</code> for SQL white-box, or <code className="text-slate-400">BA/</code>{" "}
             for access-control lab 18). When the path is wrong, the API may still serve an embedded sample after refresh.
           </p>
         ) : (
@@ -281,9 +281,9 @@ const WhiteboxIdeLab = ({
                 return (
                   <div
                     key={n}
-                    className={isVuln ? "bg-rose-500/15 border-l-2 border-rose-400 pl-2 -ml-2" : ""}
+                    className={isVuln ? "bg-rose-500/15 border-l-2 border-rose-400 pl-2 -ml-2 min-h-[20px]" : "min-h-[20px]"}
                   >
-                    {line}
+                    {line || " "}
                   </div>
                 );
               })}

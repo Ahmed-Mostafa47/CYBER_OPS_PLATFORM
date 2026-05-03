@@ -69,6 +69,8 @@ const InstructorLabsDashboard = ({ isAdmin = false }) => {
     icon: "",
     launch_path: "",
     port: "",
+    hints: "",
+    solution: "",
   });
   const getLabTypeLabel = (labtypeId) => {
     if (labtypeId === 1) return "WHITE_BOX";
@@ -143,6 +145,12 @@ const InstructorLabsDashboard = ({ isAdmin = false }) => {
       setForm(buildInitialForm());
       setZipResult(null);
       setZipFile(null);
+      
+      const successMsg = direct 
+        ? "The lab has been uploaded successfully." 
+        : "The lab has been sent to the admin for approval.";
+      window.alert(successMsg);
+
       if (direct) {
         try {
           const fresh = await labService.getLabs();
@@ -237,7 +245,7 @@ const InstructorLabsDashboard = ({ isAdmin = false }) => {
     }
   };
 
-  const handleOpenEdit = (lab) => {
+  const handleOpenEdit = async (lab) => {
     setEditError("");
     setEditForm({
       lab_id: Number(lab.lab_id) || 0,
@@ -251,8 +259,27 @@ const InstructorLabsDashboard = ({ isAdmin = false }) => {
       icon: String(lab.icon || ""),
       launch_path: String(lab.launch_path || ""),
       port: lab.port != null ? String(lab.port) : "",
+      hints: "",
+      solution: "",
     });
     setEditOpen(true);
+    if (!currentUserId) return;
+    setEditSaving(true);
+    try {
+      const res = await labService.getLabEditData({ userId: currentUserId, labId: lab.lab_id });
+      const detailedLab = res?.data?.lab;
+      if (detailedLab) {
+        setEditForm((prev) => ({
+          ...prev,
+          solution: detailedLab.solution || "",
+          hints: (detailedLab.hints || []).join("\n"),
+        }));
+      }
+    } catch (err) {
+      setEditError(err?.message || "Failed to load hints/solution.");
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const handleSaveEdit = async (e) => {
@@ -277,6 +304,8 @@ const InstructorLabsDashboard = ({ isAdmin = false }) => {
         launchPath: editForm.launch_path,
         port: editForm.port === "" ? null : Number(editForm.port),
         labtypeId: editForm.labtype_id,
+        solution: editForm.solution,
+        hints: editForm.hints.split("\n").map((h) => h.trim()).filter(Boolean),
       });
       const updated = res?.data?.lab;
       if (updated?.lab_id) {
@@ -531,24 +560,15 @@ const InstructorLabsDashboard = ({ isAdmin = false }) => {
                 </div>
               )}
               {submitSuccess && (
-                <div className="rounded-lg border border-emerald-600/60 bg-emerald-500/10 px-3 py-2 text-xs font-mono text-emerald-200 space-y-1">
-                  {submitResultKind === "direct" ? (
-                    <>
-                      <p>Lab published to the catalog immediately (no approval request).</p>
-                      {directPublishLabId ? (
-                        <p className="text-emerald-300/95">New lab ID: {directPublishLabId}</p>
-                      ) : null}
-                    </>
+                <div className="rounded-lg border border-emerald-600/60 bg-emerald-500/10 px-3 py-2 text-sm font-mono text-emerald-200 space-y-1">
+                  {isAdmin ? (
+                    <p>The lab has been uploaded successfully.</p>
                   ) : (
-                    <>
-                      <p>Proposal saved. Administrators were notified (in-app).</p>
-                      {proposalZipAttached ? (
-                        <p className="text-emerald-300/95">
-                          Validated ZIP was copied for admins — they can download it from Admin Labs.
-                        </p>
-                      ) : null}
-                    </>
+                    <p>The lab has been sent to the admin for approval.</p>
                   )}
+                  {directPublishLabId ? (
+                    <p className="text-emerald-300/95">New lab ID: {directPublishLabId}</p>
+                  ) : null}
                 </div>
               )}
               <div>
@@ -685,7 +705,7 @@ const InstructorLabsDashboard = ({ isAdmin = false }) => {
                 />
               </div>
 
-              {!zipResult?.upload_token ? (
+              {!zipResult?.upload_token && !submitSuccess ? (
                 <p className="text-[11px] font-mono text-amber-200/90 border border-amber-500/30 rounded-lg bg-amber-500/5 px-3 py-2">
                   Add Lab submit is locked until you <span className="text-amber-100">Validate</span> an archive
                   above (you must see &quot;Validation passed&quot; with a live upload session).
@@ -833,24 +853,15 @@ const InstructorLabsDashboard = ({ isAdmin = false }) => {
                   </div>
                 )}
                 {submitSuccess && (
-                  <div className="rounded-lg border border-emerald-600/60 bg-emerald-500/10 px-3 py-2 text-xs font-mono text-emerald-200 space-y-1">
-                    {submitResultKind === "direct" ? (
-                      <>
-                        <p>Lab published to the catalog immediately (no approval request).</p>
-                        {directPublishLabId ? (
-                          <p className="text-emerald-300/95">New lab ID: {directPublishLabId}</p>
-                        ) : null}
-                      </>
+                  <div className="rounded-lg border border-emerald-600/60 bg-emerald-500/10 px-3 py-2 text-sm font-mono text-emerald-200 space-y-1">
+                    {isAdmin ? (
+                      <p>The lab has been uploaded successfully.</p>
                     ) : (
-                      <>
-                        <p>Proposal saved. Administrators were notified.</p>
-                        {proposalZipAttached ? (
-                          <p className="text-emerald-300/95">
-                            ZIP attached for admin download (Admin Labs → lab proposals).
-                          </p>
-                        ) : null}
-                      </>
+                      <p>The lab has been sent to the admin for approval.</p>
                     )}
+                    {directPublishLabId ? (
+                      <p className="text-emerald-300/95">New lab ID: {directPublishLabId}</p>
+                    ) : null}
                   </div>
                 )}
                 <div>
@@ -990,7 +1001,7 @@ const InstructorLabsDashboard = ({ isAdmin = false }) => {
                   />
                 </div>
 
-                {!zipResult?.upload_token ? (
+                {!zipResult?.upload_token && !submitSuccess ? (
                   <p className="text-[11px] font-mono text-amber-200/90 border border-amber-500/30 rounded-lg bg-amber-500/5 px-3 py-2">
                     Close this dialog and use <span className="text-amber-100">Validate</span> on the main page first —
                     submit stays locked until validation succeeds.
@@ -1144,6 +1155,24 @@ const InstructorLabsDashboard = ({ isAdmin = false }) => {
                       onChange={(e) => setEditForm((f) => ({ ...f, launch_path: e.target.value }))}
                     />
                   </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-mono text-slate-400 mb-1.5">Hints (one per line)</label>
+                  <textarea
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400 min-h-[70px]"
+                    value={editForm.hints}
+                    onChange={(e) => setEditForm((f) => ({ ...f, hints: e.target.value }))}
+                    placeholder="Hint 1\nHint 2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono text-slate-400 mb-1.5">Solution</label>
+                  <textarea
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400 min-h-[90px]"
+                    value={editForm.solution}
+                    onChange={(e) => setEditForm((f) => ({ ...f, solution: e.target.value }))}
+                    placeholder="Detailed walkthrough of the intended solution."
+                  />
                 </div>
                 <div className="pt-2 flex flex-col sm:flex-row sm:justify-end gap-2">
                   <button

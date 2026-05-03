@@ -40,7 +40,7 @@ import "./styles/animations.css";
 import { WHITEBOX_WORKBENCH_LAB_IDS } from "./constants/labs";
 import { fetchHackMeMachineIdentity } from "./utils/hackmeIdentity";
 
-const API_BASE = "http://localhost/HackMe/server/api";
+const API_BASE = "http://localhost/HackMe/server/controllers";
 
 function AppContent() {
   const {
@@ -130,7 +130,7 @@ function AppContent() {
       client_tz_offset_minutes: new Date().getTimezoneOffset(),
     });
     try {
-      const res = await fetch(`${API_BASE}/audit_event.php`, {
+      const res = await fetch(`${API_BASE}/security/audit_event.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: payload,
@@ -224,7 +224,7 @@ function AppContent() {
       const uid = currentUser?.user_id ?? currentUser?.id;
       if (!uid) return;
       try {
-        const res = await fetch(`${API_BASE}/get_user_points.php?user_id=${uid}`);
+        const res = await fetch(`${API_BASE}/users/get_user_points.php?user_id=${uid}`);
         const data = await res.json();
         if (data.success && data.total_points != null) {
           updateUserPoints(data.total_points);
@@ -240,7 +240,7 @@ function AppContent() {
     const refetchPoints = async () => {
       if (!currentUser?.user_id || document.visibilityState !== "visible") return;
       try {
-        const res = await fetch(`${API_BASE}/get_user_points.php?user_id=${currentUser.user_id}`);
+        const res = await fetch(`${API_BASE}/users/get_user_points.php?user_id=${currentUser.user_id}`);
         const data = await res.json();
         if (data.success && data.total_points != null) {
           updateUserPoints(data.total_points);
@@ -255,7 +255,7 @@ function AppContent() {
   const handleRegisterStart = async (userData) => {
     try {
       const response = await fetch(
-        "http://localhost/HackMe/server/auth/send_verification.php",
+        "http://localhost/HackMe/server/controllers/auth/send_verification.php",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -314,7 +314,7 @@ function AppContent() {
 
     try {
       const response = await axios.post(
-        "http://localhost/HackMe/server/auth/delete_account.php",
+        "http://localhost/HackMe/server/controllers/users/delete_account.php",
         {
           user_id: currentUser.user_id,
           password: password,
@@ -368,7 +368,7 @@ function AppContent() {
         client_tz_offset_minutes: new Date().getTimezoneOffset(),
       });
       try {
-        await fetch(`${API_BASE}/audit_event.php`, {
+        await fetch(`${API_BASE}/security/audit_event.php`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: payload,
@@ -382,7 +382,7 @@ function AppContent() {
 
   const fetchRoleRequestStatus = async (userId) => {
     try {
-      const { data } = await axios.get(`${API_BASE}/request_role.php`, {
+      const { data } = await axios.get(`${API_BASE}/users/request_role.php`, {
         params: { user_id: userId },
       });
       if (data.success) {
@@ -398,7 +398,7 @@ function AppContent() {
 
   const fetchPendingRoleRequests = async () => {
     try {
-      const { data } = await axios.get(`${API_BASE}/request_role.php`, {
+      const { data } = await axios.get(`${API_BASE}/users/request_role.php`, {
         params: { all: 1 },
       });
       if (data.success) {
@@ -428,10 +428,10 @@ function AppContent() {
     };
     
     console.log("Sending role request:", requestData);
-    console.log("API URL:", `${API_BASE}/request_role.php`);
+    console.log("API URL:", `${API_BASE}/users/request_role.php`);
     
     try {
-      const response = await axios.post(`${API_BASE}/request_role.php`, requestData, {
+      const response = await axios.post(`${API_BASE}/users/request_role.php`, requestData, {
         headers: {
           'Content-Type': 'application/json',
         },
@@ -606,7 +606,7 @@ function AppContent() {
         client_tz_offset_minutes: new Date().getTimezoneOffset(),
       });
       try {
-        const res = await fetch(`${API_BASE}/audit_event.php`, {
+        const res = await fetch(`${API_BASE}/security/audit_event.php`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: payload,
@@ -816,7 +816,7 @@ function AppContent() {
             onFlagSuccess={async () => {
               if (!currentUser?.user_id) return;
               try {
-                const res = await fetch(`${API_BASE}/get_user_points.php?user_id=${currentUser.user_id}`);
+                const res = await fetch(`${API_BASE}/users/get_user_points.php?user_id=${currentUser.user_id}`);
                 const data = await res.json();
                 if (data.success && data.total_points != null) {
                   updateUserPoints(data.total_points);
@@ -845,7 +845,7 @@ function AppContent() {
             onFlagSuccess={async () => {
               if (!currentUser?.user_id) return;
               try {
-                const res = await fetch(`${API_BASE}/get_user_points.php?user_id=${currentUser.user_id}`);
+                const res = await fetch(`${API_BASE}/users/get_user_points.php?user_id=${currentUser.user_id}`);
                 const data = await res.json();
                 if (data.success && data.total_points != null) {
                   updateUserPoints(data.total_points);

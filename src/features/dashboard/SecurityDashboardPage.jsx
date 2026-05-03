@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Shield, BarChart3, Target, Users, Activity, RefreshCw } from "lucide-react";
 import axios from "axios";
 
-const API_BASE = "http://localhost/HackMe/server/api";
+const API_BASE = "http://localhost/HackMe/server/controllers";
 
 const WINDOWS = [
   { hours: 24, label: "24h" },
@@ -22,7 +22,7 @@ const SecurityDashboardPage = ({ currentUser }) => {
     setLoading(true);
     setError("");
     try {
-      const { data: res } = await axios.get(`${API_BASE}/security_dashboard.php`, {
+      const { data: res } = await axios.get(`${API_BASE}/security/security_dashboard.php`, {
         params: {
           current_user_id: currentUser?.user_id ?? currentUser?.id,
           hours,
