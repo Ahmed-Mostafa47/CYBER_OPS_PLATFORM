@@ -189,23 +189,7 @@ const WhiteboxIdeLab = ({
 
   return (
     <section className="rounded-2xl border border-slate-700 bg-slate-950/80 overflow-hidden shadow-xl shadow-black/50">
-      {showProdBanner && (
-        <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-[11px] font-mono text-amber-100/95 leading-relaxed">
-          {payload?.lab_unregistered ? (
-            <>
-              <span className="text-amber-200 font-semibold">Unregistered lab (DB):</span> no row in{" "}
-              <code className="text-amber-100/90">labs</code> yet — UI uses fallback metadata. Submissions still earn
-              points; run your SQL migration when ready.
-            </>
-          ) : (
-            <>
-              <span className="text-amber-200 font-semibold">Incomplete setup:</span> add or fix{" "}
-              <code className="text-amber-100/90">challenges.whitebox_files_ref</code> so file metadata comes from the
-              database (optional; verification still works).
-            </>
-          )}
-        </div>
-      )}
+      { }
       <div className="flex items-center justify-between gap-3 border-b border-slate-800 px-4 py-3 bg-slate-900/90">
         <div className="flex items-center gap-2 min-w-0">
           <Terminal className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -387,9 +371,8 @@ const WhiteboxIdeLab = ({
           </button>
           {feedback && (
             <p
-              className={`text-xs font-mono max-w-xl ${
-                feedback.ok ? "text-emerald-300" : "text-rose-300"
-              }`}
+              className={`text-xs font-mono max-w-xl ${feedback.ok ? "text-emerald-300" : "text-rose-300"
+                }`}
             >
               {feedback.text}
             </p>
