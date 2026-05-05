@@ -18,10 +18,13 @@ if (file_exists($vendorAutoload)) {
     $mailerAvailable = false;
 }
 
-const CYBEROPS_MAIL_USERNAME = 'deboabdo1234@gmail.com';
-const CYBEROPS_MAIL_PASSWORD = 'gjlwqkofrqlyozop';
-const CYBEROPS_MAIL_FROM_NAME = 'CYBER_OPS Platform';
-const CYBEROPS_ADMIN_EMAIL = 'deboabdo1234@gmail.com';
+require_once __DIR__ . '/../../core/utils/load_env.php';
+
+// Mail settings from .env
+define('CYBEROPS_MAIL_USERNAME', $_ENV['MAIL_USER'] ?? '');
+define('CYBEROPS_MAIL_PASSWORD', $_ENV['MAIL_PASS'] ?? '');
+define('CYBEROPS_MAIL_FROM_NAME', $_ENV['MAIL_FROM_NAME'] ?? 'CYBER_OPS Platform');
+define('CYBEROPS_ADMIN_EMAIL', $_ENV['ADMIN_EMAIL'] ?? CYBEROPS_MAIL_USERNAME);
 
 function cyberops_mailer()
 {
@@ -32,12 +35,12 @@ function cyberops_mailer()
     
     $mail = new PHPMailer\PHPMailer\PHPMailer(true);
     $mail->isSMTP();
-    $mail->Host = 'smtp.gmail.com';
+    $mail->Host = $_ENV['MAIL_HOST'] ?? 'smtp.gmail.com';
     $mail->SMTPAuth = true;
     $mail->Username = CYBEROPS_MAIL_USERNAME;
     $mail->Password = CYBEROPS_MAIL_PASSWORD;
-    $mail->SMTPSecure = 'tls';
-    $mail->Port = 587;
+    $mail->SMTPSecure = $_ENV['MAIL_ENCRYPTION'] ?? 'tls';
+    $mail->Port = (int)($_ENV['MAIL_PORT'] ?? 587);
     $mail->setFrom(CYBEROPS_MAIL_USERNAME, CYBEROPS_MAIL_FROM_NAME);
     $mail->isHTML(true);
     return $mail;

@@ -65,9 +65,11 @@ function send_notification(
     $notificationId = (int)$conn->insert_id;
     $stmt->close();
 
+require_once __DIR__ . '/../../core/utils/load_env.php';
+
     // Send to Node.js server for real-time delivery (non-blocking)
-    $nodeServerUrl = 'http://localhost:3001/push';
-    $secretToken = 'your-secret-token-change-this-in-production';
+    $nodeServerUrl = $_ENV['NOTIFICATION_SERVER_URL'] ?? 'http://localhost:3001/push';
+    $secretToken = $_ENV['NOTIFICATION_SECRET'] ?? 'your-secret-token-change-this-in-production';
 
     $nodePayload = [
         'notification_id' => $notificationId,
