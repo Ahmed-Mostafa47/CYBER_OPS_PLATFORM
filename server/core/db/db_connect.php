@@ -2,13 +2,14 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../core/db/pdo_mysqli_shim.php';
+require_once __DIR__ . '/../utils/load_env.php';
 
-// Aiven Cloud MySQL connection settings
-$dbHost = 'mysql-2fba11c2-hackme-2bfc.k.aivencloud.com';
-$dbUser = 'avnadmin';
-$dbPass = 'AVNS_9bCdlZ5aiyIu2JCdzy2'; // use password for server aiven
-$dbName = 'ctf_platform';
-$dbPort = 14666;
+// Database connection settings from .env
+$dbHost = $_ENV['DB_HOST'] ?? 'localhost';
+$dbUser = $_ENV['DB_USER'] ?? '';
+$dbPass = $_ENV['DB_PASS'] ?? '';
+$dbName = $_ENV['DB_NAME'] ?? '';
+$dbPort = (int)($_ENV['DB_PORT'] ?? 3306);
 
 ini_set('default_socket_timeout', '10');
 
