@@ -68,22 +68,35 @@ if ($userId < 1 && $accessToken !== '' && $labId >= 1) {
         "AND used_at IS NULL AND expires_at > NOW() LIMIT 1"
     );
     if ($tr && ($trow = $tr->fetch_assoc())) {
-        if (!hackme_lab_token_bind_row_matches($trow, [
-            'ip' => hackme_request_client_ip(),
-            'device_bind' => $deviceBindInput,
-            'mac_address' => $macInput,
-            'client_local_ip' => $localInput,
-        ])) {
-            echo json_encode([
-                'success' => false,
-                'message' => 'LAB_TOKEN_BIND_MISMATCH',
-                'detail' => 'This access token was issued for a different IP or browser session.',
-            ]);
-            exit;
-        }
-        $rawUid = $trow['user_id'] ?? null;
-        if ($rawUid !== null && (int) $rawUid > 0) {
-            $userId = (int) $rawUid;
+        $rawUid = (int)($trow['user_id'] ?? 0);
+        if ($rawUid > 0) {
+            // If the bind fails, check if the user ALREADY solved this lab. 
+            // If they did, we can return ALREADY_SOLVED even if the bind is wrong (e.g. solving from a different context/browser).
+            if (!hackme_lab_token_bind_row_matches($trow, [
+                'ip' => hackme_request_client_ip(),
+                'device_bind' => $deviceBindInput,
+                'mac_address' => $macInput,
+                'client_local_ip' => $localInput,
+            ])) {
+                $checkSolved = $conn->query("
+                    SELECT 1 FROM submissions s
+                    INNER JOIN lab_instances li ON li.instance_id = s.instance_id
+                    WHERE li.lab_id = $labIdInt AND s.user_id = $rawUid AND s.status = 'graded'
+                    LIMIT 1
+                ");
+                if ($checkSolved && $checkSolved->num_rows > 0) {
+                    echo json_encode(['success' => false, 'message' => 'LAB_ALREADY_SOLVED', 'already_solved' => true]);
+                    exit;
+                }
+
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'LAB_TOKEN_BIND_MISMATCH',
+                    'detail' => 'This access token was issued for a different IP or browser session.',
+                ]);
+                exit;
+            }
+            $userId = $rawUid;
         } else {
             echo json_encode([
                 'success' => false,
