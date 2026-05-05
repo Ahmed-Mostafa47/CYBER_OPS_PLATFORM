@@ -83,27 +83,21 @@ if (!$insert_stmt->execute()) {
 }
 $insert_stmt->close();
 
-// Generate reset link
-// Update this URL to match your application's domain
-// For local development: http://localhost:5173/reset-password?token=xxxxx
-// For production: https://yourdomain.com/reset-password?token=xxxxx
-$reset_link = 'http://localhost:5173/reset-password?token=' . $reset_token;
+require_once __DIR__ . '/../../helpers/utils/mailer.php';
 
-// Send email using PHPMailer
+// Generate reset link
+$frontendUrl = $_ENV['FRONTEND_URL'] ?? 'http://localhost:5173';
+$reset_link = rtrim($frontendUrl, '/') . '/reset-password?token=' . $reset_token;
+
+// Send email using shared mailer
 try {
-    $mail = new PHPMailer(true);
-    
-    // SMTP configuration - update with your email settings
-    $mail->isSMTP();
-    $mail->Host = 'smtp.gmail.com'; // Your SMTP host
-    $mail->SMTPAuth = true;
-    $mail->Username = 'deboabdo1234@gmail.com'; // Your email
-    $mail->Password = 'gjlwqkofrqlyozop'; // Your app password
-    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-    $mail->Port = 587;
+    $mail = cyberops_mailer();
+    if (!$mail) {
+        throw new Exception("Mailer not available");
+    }
 
     // Email content
-    $mail->setFrom('deboabdo1234@gmail.com', 'CTF Platform');
+    $mail->setFrom(CYBEROPS_MAIL_USERNAME, CYBEROPS_MAIL_FROM_NAME);
     $mail->addAddress($email, $user['username']);
     $mail->isHTML(true);
     $mail->Subject = 'Password Reset Request - CTF Platform';

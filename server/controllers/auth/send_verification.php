@@ -92,18 +92,16 @@ if (!$stmt->execute()) {
 }
 $stmt->close();
 
-// Send email via PHPMailer
-try {
-    $mail = new PHPMailer(true);
-    $mail->isSMTP();
-    $mail->Host = 'smtp.gmail.com';
-    $mail->SMTPAuth = true;
-    $mail->Username = 'deboabdo1234@gmail.com'; 
-    $mail->Password = 'gjlwqkofrqlyozop';      
-    $mail->SMTPSecure = 'tls';
-    $mail->Port = 587;
+require_once __DIR__ . '/../../helpers/utils/mailer.php';
 
-    $mail->setFrom('deboabdo1234@gmail.com', 'HACK_ME Platform');
+// Send email via shared mailer
+try {
+    $mail = cyberops_mailer();
+    if (!$mail) {
+        throw new Exception("Mailer not available");
+    }
+
+    $mail->setFrom(CYBEROPS_MAIL_USERNAME, CYBEROPS_MAIL_FROM_NAME);
     $mail->addAddress($email, $username);
     $mail->isHTML(true);
     $mail->Subject = 'HACK_ME - Email Verification Code';
