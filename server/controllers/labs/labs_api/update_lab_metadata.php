@@ -195,28 +195,36 @@ if (!$ok) {
 
 // Update Hints
 if (is_array($hintsRaw)) {
-    // Find the primary challenge for this lab
-    $challengeId = 0;
-    $cRes = $conn->query("SELECT challenge_id FROM challenges WHERE lab_id = $labId AND is_active = 1 ORDER BY order_index ASC, challenge_id ASC LIMIT 1");
-    if ($cRes && $cRes->num_rows > 0) {
-        $challengeId = (int)$cRes->fetch_assoc()['challenge_id'];
-    } else {
-        // Create a default challenge if none exists
+    // 1. Find all active challenges for this lab
+    $allChallenges = [];
+    $cRes = $conn->query("SELECT challenge_id FROM challenges WHERE lab_id = $labId AND is_active = 1 ORDER BY order_index ASC, challenge_id ASC");
+    if ($cRes) {
+        while ($cRow = $cRes->fetch_assoc()) {
+            $allChallenges[] = (int)$cRow['challenge_id'];
+        }
+    }
+
+    // 2. If no challenge exists, create one
+    if (empty($allChallenges)) {
         $titleForChall = $title !== '' ? $title : 'Challenge 1';
         $titleEscForChall = $conn->real_escape_string($titleForChall);
         $conn->query("INSERT INTO challenges (lab_id, created_by, title, statement, is_active, order_index) VALUES ($labId, $userId, '$titleEscForChall', '', 1, 0)");
-        $challengeId = (int)$conn->insert_id;
+        $allChallenges[] = (int)$conn->insert_id;
     }
-    
-    if ($challengeId > 0) {
-        // Delete old hints for this specific challenge
-        $conn->query("DELETE FROM hints WHERE challenge_id = $challengeId");
-        // Insert new hints
+
+    if (!empty($allChallenges)) {
+        // 3. Delete ALL hints from ALL challenges of this lab to prevent duplication
+        // (Since the UI currently only manages a single consolidated list of hints for the whole lab)
+        $challIdsList = implode(',', $allChallenges);
+        $conn->query("DELETE FROM hints WHERE challenge_id IN ($challIdsList)");
+
+        // 4. Insert new hints into the primary (first) challenge
+        $primaryChallengeId = $allChallenges[0];
         foreach ($hintsRaw as $hText) {
             $hTextTrim = trim((string)$hText);
             if ($hTextTrim !== '') {
                 $hTextEsc = $conn->real_escape_string($hTextTrim);
-                $conn->query("INSERT INTO hints (challenge_id, text) VALUES ($challengeId, '$hTextEsc')");
+                $conn->query("INSERT INTO hints (challenge_id, text) VALUES ($primaryChallengeId, '$hTextEsc')");
             }
         }
     }

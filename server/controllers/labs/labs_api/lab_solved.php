@@ -83,22 +83,41 @@ if (!$res || $res->num_rows === 0) {
 }
 
 $row = $res->fetch_assoc();
+$userId = (int)($row['user_id'] ?? 0);
+if ($userId < 1) {
+    echo json_encode(['success' => false, 'message' => 'Token has no associated user', 'data' => ['points_earned' => 0]]);
+    exit;
+}
+
+// Token bind check
 if (!hackme_lab_token_bind_row_matches($row, [
     'ip' => hackme_request_client_ip(),
     'device_bind' => $deviceBindInput,
     'mac_address' => $macInput,
     'client_local_ip' => $localInput,
 ])) {
+    // If bind mismatch, check if they already solved it
+    $checkSolved = $conn->query("
+        SELECT 1 FROM submissions s
+        INNER JOIN lab_instances li ON li.instance_id = s.instance_id
+        WHERE li.lab_id = $labIdEsc AND s.user_id = $userId AND s.status = 'graded'
+        LIMIT 1
+    ");
+    if ($checkSolved && $checkSolved->num_rows > 0) {
+        echo json_encode([
+            'success' => true, 
+            'message' => 'LAB_ALREADY_SOLVED', 
+            'data' => ['points_earned' => 0],
+            'already_solved' => true
+        ]);
+        exit;
+    }
+
     echo json_encode([
         'success' => false,
         'message' => 'LAB_TOKEN_BIND_MISMATCH',
         'data' => ['points_earned' => 0],
     ]);
-    exit;
-}
-$userId = (int)($row['user_id'] ?? 0);
-if ($userId < 1) {
-    echo json_encode(['success' => false, 'message' => 'Token has no associated user', 'data' => ['points_earned' => 0]]);
     exit;
 }
 
