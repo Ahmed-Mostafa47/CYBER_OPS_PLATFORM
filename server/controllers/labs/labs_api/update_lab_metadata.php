@@ -164,18 +164,16 @@ $setParts = [
     "difficulty = '$difficultyEsc'",
     "points_total = $pointsTotal",
     "visibility = '$visibilityEsc'",
+    "icon = '$iconEsc'",
+    "launch_path = '$launchEsc'",
 ];
 if ($isPublished !== null) {
     $setParts[] = "is_published = $isPublished";
 }
-if ($icon !== '') {
-    $setParts[] = "icon = '$iconEsc'";
-}
-if ($launchPath !== '') {
-    $setParts[] = "launch_path = '$launchEsc'";
-}
 if ($port !== null) {
     $setParts[] = "port = $port";
+} else {
+    $setParts[] = "port = NULL";
 }
 if ($labtypeId !== null) {
     $setParts[] = "labtype_id = $labtypeId";
@@ -184,11 +182,7 @@ if ($solutionRaw !== null) {
     $solutionEsc = $conn->real_escape_string((string)$solutionRaw);
     $setParts[] = "solution = '$solutionEsc'";
 }
-if ($setParts === []) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'No metadata fields to update']);
-    exit;
-}
+
 $setParts[] = "updated_at = NOW()";
 
 $sql = "UPDATE labs SET " . implode(", ", $setParts) . " WHERE lab_id = $labId LIMIT 1";
@@ -198,25 +192,26 @@ if (!$ok) {
     echo json_encode(['success' => false, 'message' => 'Failed to update lab metadata: ' . $conn->error]);
     exit;
 }
-if ($conn->affected_rows < 0) {
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Lab metadata update failed']);
-    exit;
-}
 
+// Update Hints
 if (is_array($hintsRaw)) {
+    // Find the primary challenge for this lab
     $challengeId = 0;
-    $cRes = $conn->query("SELECT challenge_id FROM challenges WHERE lab_id = $labId AND is_active = 1 ORDER BY order_index ASC LIMIT 1");
+    $cRes = $conn->query("SELECT challenge_id FROM challenges WHERE lab_id = $labId AND is_active = 1 ORDER BY order_index ASC, challenge_id ASC LIMIT 1");
     if ($cRes && $cRes->num_rows > 0) {
         $challengeId = (int)$cRes->fetch_assoc()['challenge_id'];
     } else {
-        $titleEscForChall = $titleEsc !== '' ? $titleEsc : 'Challenge 1';
-        $conn->query("INSERT INTO challenges (lab_id, created_by, title, statement, is_active) VALUES ($labId, $userId, '$titleEscForChall', '', 1)");
-        $challengeId = $conn->insert_id;
+        // Create a default challenge if none exists
+        $titleForChall = $title !== '' ? $title : 'Challenge 1';
+        $titleEscForChall = $conn->real_escape_string($titleForChall);
+        $conn->query("INSERT INTO challenges (lab_id, created_by, title, statement, is_active, order_index) VALUES ($labId, $userId, '$titleEscForChall', '', 1, 0)");
+        $challengeId = (int)$conn->insert_id;
     }
     
     if ($challengeId > 0) {
+        // Delete old hints for this specific challenge
         $conn->query("DELETE FROM hints WHERE challenge_id = $challengeId");
+        // Insert new hints
         foreach ($hintsRaw as $hText) {
             $hTextTrim = trim((string)$hText);
             if ($hTextTrim !== '') {
