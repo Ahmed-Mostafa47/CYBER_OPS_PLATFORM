@@ -18,7 +18,7 @@ const EmailVerificationPage = ({
 }) => {
   const savedEmail = sessionStorage.getItem("verificationEmail");
   const [code, setCode] = useState(["", "", "", "", "", ""]);
-  
+
   // Calculate initial time left from stored expiration timestamp
   const getInitialTimeLeft = () => {
     const expirationTime = localStorage.getItem("verificationCodeExpiresAt");
@@ -30,7 +30,7 @@ const EmailVerificationPage = ({
     }
     return 300; // Default 5 minutes if no stored time
   };
-  
+
   const [timeLeft, setTimeLeft] = useState(getInitialTimeLeft());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -136,7 +136,7 @@ const EmailVerificationPage = ({
 
     try {
       const emailToUse = email || userEmail || savedEmail;
-      
+
       if (!emailToUse) {
         setError("Email not found. Please register again.");
         setIsLoading(false);
@@ -166,20 +166,20 @@ const EmailVerificationPage = ({
         // Set new expiration time (5 minutes from now)
         const expirationTime = Date.now() + (5 * 60 * 1000); // 5 minutes in milliseconds
         localStorage.setItem("verificationCodeExpiresAt", expirationTime.toString());
-        
+
         setTimeLeft(300);
         setCode(["", "", "", "", "", ""]);
         setError("");
         setSuccessMessage("Verification code sent successfully!");
-        
+
         if (onResendCode) {
           onResendCode();
         }
-        
+
         setTimeout(() => {
           setSuccessMessage("");
         }, 3000);
-        
+
         setTimeout(() => {
           if (inputRefs.current[0]) {
             inputRefs.current[0].focus();
@@ -286,11 +286,10 @@ const EmailVerificationPage = ({
               <button
                 onClick={handleResendCode}
                 disabled={timeLeft > 0 || isLoading}
-                className={`flex items-center justify-center gap-2 mx-auto font-mono text-sm transition-all duration-200 px-4 py-2 rounded-lg border ${
-                  timeLeft > 0 || isLoading
+                className={`flex items-center justify-center gap-2 mx-auto font-mono text-sm transition-all duration-200 px-4 py-2 rounded-lg border ${timeLeft > 0 || isLoading
                     ? "text-gray-500 border-gray-600/30 bg-gray-700/20 cursor-not-allowed"
                     : "text-green-400 border-green-500/30 bg-green-500/10 hover:bg-green-500/20 hover:border-green-500/50 hover:text-green-300"
-                }`}
+                  }`}
               >
                 <RotateCcw className="w-4 h-4" />
                 {timeLeft > 0
