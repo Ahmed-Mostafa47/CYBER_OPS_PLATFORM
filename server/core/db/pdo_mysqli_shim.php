@@ -94,6 +94,13 @@ final class PdoMysqliShim
         return new PdoMysqliStmt($this, $st);
     }
 
+    public function close(): void
+    {
+        // No-op for PDO shim as the connection will be closed when the object is destroyed
+        // But we can clear the internal PDO reference if we want
+        // $this->pdo = null;
+    }
+
     private function clearErr(): void
     {
         $this->errno = 0;
@@ -143,6 +150,11 @@ final class PdoMysqliResult
         $this->rows = [];
         $this->i = 0;
         $this->num_rows = 0;
+    }
+
+    public function close(): void
+    {
+        $this->free();
     }
 }
 

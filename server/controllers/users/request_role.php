@@ -24,14 +24,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // Load DB Connection
 require_once __DIR__ . '/../../core/db/db_connect.php';
 require_once __DIR__ . '/../../helpers/security/permissions.php';
-require_once __DIR__ . '/../../helpers/security/permissions.php';  
 require_once __DIR__ . '/../../helpers/security/audit_log.php';
 
 // Try to load mailer, but don't fail if it's not available
 $GLOBALS['mailerLoaded'] = false;
-if (file_exists(__DIR__ . '/../utils/mailer.php')) {
+$mailerPath = __DIR__ . '/../../helpers/utils/mailer.php';
+if (file_exists($mailerPath)) {
     try {
-        require_once __DIR__ . '/../../helpers/utils/mailer.php';
+        require_once $mailerPath;
         $GLOBALS['mailerLoaded'] = function_exists('cyberops_send_admin_notification');
     } catch (Throwable $e) {
         error_log('Failed to load mailer: ' . $e->getMessage());

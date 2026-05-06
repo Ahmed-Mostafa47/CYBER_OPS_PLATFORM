@@ -378,12 +378,12 @@ if (!$user) {
                 }
             }
             if ($debug_user['is_active'] == 0) {
-                echo json_encode(['success' => false, 'message' => 'Account is inactive. Please contact administrator.']);
+                echo json_encode(['success' => false, 'message' => 'Invalid email or password']);
             } else {
                 echo json_encode(['success' => false, 'message' => 'Invalid email or password']);
             }
         } else {
-            echo json_encode(['success' => false, 'message' => 'No account found with this email. Please register first.']);
+            echo json_encode(['success' => false, 'message' => 'Invalid email or password']);
         }
     } else {
         echo json_encode(['success' => false, 'message' => 'Invalid email or password']);
@@ -422,7 +422,7 @@ if (!$user) {
     }
     hackme_detect_bruteforce($conn, $requestIp, $email, $clientLocalIp, $clientTimeUtc, $clientTimezone, $clientTzOffsetMinutes);
     if (($scoreResult['level'] ?? 'normal') === 'suspicious') {
-        echo json_encode(['success' => false, 'message' => 'Invalid email or password (warning: suspicious activity detected).']);
+        echo json_encode(['success' => false, 'message' => 'Invalid email or password']);
         exit;
     }
     exit;
@@ -481,7 +481,7 @@ if (!password_verify($password, $user['password_hash'])) {
     }
     hackme_detect_bruteforce($conn, $requestIp, (string)$user['username'], $clientLocalIp, $clientTimeUtc, $clientTimezone, $clientTzOffsetMinutes);
     $warn = (($scoreResult['level'] ?? 'normal') === 'suspicious');
-    echo json_encode(['success' => false, 'message' => $warn ? 'Invalid email or password (warning: suspicious activity detected).' : 'Invalid email or password']);
+    echo json_encode(['success' => false, 'message' => 'Invalid email or password']);
     exit;
 }
 
