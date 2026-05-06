@@ -73,28 +73,45 @@ $clientTimeUtc = trim((string) ($input['client_time_utc'] ?? ''));
 $clientTimezone = trim((string) ($input['client_timezone'] ?? ''));
 $clientTzOffsetMinutes = isset($input['client_tz_offset_minutes']) ? (int) $input['client_tz_offset_minutes'] : null;
 
-if ($userId < 1 && $accessToken !== '' && $labId >= 1) {
-    $atEsc = $conn->real_escape_string($accessToken);
-    $labIdInt = (int) $labId;
-    $tr = $conn->query(
-        "SELECT user_id, client_ip, device_bind, client_mac, client_local_ip FROM lab_access_tokens WHERE token = '$atEsc' AND lab_id = $labIdInt " .
-        "AND used_at IS NULL AND expires_at > NOW() LIMIT 1"
-    );
     if ($tr && ($trow = $tr->fetch_assoc())) {
-        if (!hackme_lab_token_bind_row_matches($trow, [
-            'ip' => hackme_request_client_ip(),
-            'device_bind' => $deviceBindInput,
-            'mac_address' => $macInput,
-            'client_local_ip' => $localInput,
-        ])) {
-            echo json_encode([
-                'success' => false,
-                'message' => 'LAB_TOKEN_BIND_MISMATCH',
-                'data' => ['points_earned' => 0],
-            ]);
-            exit;
+        $rawUid = (int)($trow['user_id'] ?? 0);
+        if ($rawUid > 0) {
+            // Token bind check
+            if (!hackme_lab_token_bind_row_matches($trow, [
+                'ip' => hackme_request_client_ip(),
+                'device_bind' => $deviceBindInput,
+                'mac_address' => $macInput,
+                'client_local_ip' => $localInput,
+            ])) {
+                // If bind mismatch, check if they already solved it. 
+                // For white-box, we check if they already have a graded submission for this lab.
+                $checkSolved = $conn->query("
+                    SELECT 1 FROM submissions s
+                    INNER JOIN lab_instances li ON li.instance_id = s.instance_id
+                    WHERE li.lab_id = $labIdInt AND s.user_id = $rawUid AND s.status = 'graded'
+                    LIMIT 1
+                ");
+                if ($checkSolved && $checkSolved->num_rows > 0) {
+                    echo json_encode([
+                        'success' => true,
+                        'message' => 'LAB_ALREADY_SOLVED',
+                        'data' => [
+                            'points_earned' => 0,
+                            'already_solved' => true
+                        ]
+                    ]);
+                    exit;
+                }
+
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'LAB_TOKEN_BIND_MISMATCH',
+                    'data' => ['points_earned' => 0],
+                ]);
+                exit;
+            }
+            $userId = $rawUid;
         }
-        $userId = (int) ($trow['user_id'] ?? 0);
     }
 }
 
