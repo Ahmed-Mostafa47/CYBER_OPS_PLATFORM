@@ -190,7 +190,10 @@ try {
     echo json_encode(['success'=>true, 'message'=>'Verification code sent successfully']);
     exit;
 } catch (Exception $e) {
-    echo json_encode(['success'=>false, 'message'=>'Mailer error: '.$mail->ErrorInfo]);
+    $errorMsg = (isset($mail) && $mail instanceof PHPMailer\PHPMailer\PHPMailer && !empty($mail->ErrorInfo))
+        ? $mail->ErrorInfo
+        : $e->getMessage();
+    echo json_encode(['success' => false, 'message' => 'Mailer error: ' . $errorMsg]);
     exit;
 }
 

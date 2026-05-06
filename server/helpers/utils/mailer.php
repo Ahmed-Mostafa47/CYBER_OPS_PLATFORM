@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 // Check if vendor autoload exists before requiring
-$vendorAutoload = __DIR__ . '/../auth/vendor/autoload.php';
+$vendorAutoload = __DIR__ . '/../../vendor/autoload.php';
 $mailerAvailable = false;
 
 if (file_exists($vendorAutoload)) {
@@ -21,10 +21,10 @@ if (file_exists($vendorAutoload)) {
 require_once __DIR__ . '/../../core/utils/load_env.php';
 
 // Mail settings from .env
-define('CYBEROPS_MAIL_USERNAME', $_ENV['MAIL_USER'] ?? '');
-define('CYBEROPS_MAIL_PASSWORD', $_ENV['MAIL_PASS'] ?? '');
-define('CYBEROPS_MAIL_FROM_NAME', $_ENV['MAIL_FROM_NAME'] ?? 'CYBER_OPS Platform');
-define('CYBEROPS_ADMIN_EMAIL', $_ENV['ADMIN_EMAIL'] ?? CYBEROPS_MAIL_USERNAME);
+if (!defined('CYBEROPS_MAIL_USERNAME'))  define('CYBEROPS_MAIL_USERNAME',  $_ENV['MAIL_USER']      ?? '');
+if (!defined('CYBEROPS_MAIL_PASSWORD'))  define('CYBEROPS_MAIL_PASSWORD',  $_ENV['MAIL_PASS']      ?? '');
+if (!defined('CYBEROPS_MAIL_FROM_NAME')) define('CYBEROPS_MAIL_FROM_NAME', $_ENV['MAIL_FROM_NAME'] ?? 'CYBER_OPS Platform');
+if (!defined('CYBEROPS_ADMIN_EMAIL'))    define('CYBEROPS_ADMIN_EMAIL',    $_ENV['ADMIN_EMAIL']    ?? CYBEROPS_MAIL_USERNAME);
 
 function cyberops_mailer()
 {
