@@ -16,8 +16,8 @@ if (is_readable($localPath)) {
 }
 
 return [
-    'openai_api_key' => (string) ($local['openai_api_key'] ?? (getenv('OPENAI_API_KEY') ?: '')),
-    'perspective_api_key' => (string) ($local['perspective_api_key'] ?? (getenv('PERSPECTIVE_API_KEY') ?: (getenv('GOOGLE_PERSPECTIVE_KEY') ?: ''))),
+    'gemini_api_key' => (string) ($local['gemini_api_key'] ?? (getenv('GEMINI_API_KEY') ?: '')),
+    'perspective_api_key' => (string) ($local['perspective_api_key'] ?? (getenv('PERSPECTIVE_API_KEY') ?: (getenv('GOOGLE_PERSPECTIVE_KEY') ?: (getenv('GEMINI_API_KEY') ?: '')))),
     /** Score 0–1; above = flagged (Perspective) */
     'perspective_threshold' => isset($local['perspective_threshold']) ? (float) $local['perspective_threshold'] : 0.72,
 ];
