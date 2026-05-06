@@ -116,6 +116,108 @@ try {
         $delete_notifications_stmt->execute();
         $delete_notifications_stmt->close();
     }
+
+    // Delete findings (where user is the reviewer)
+    $delete_findings_stmt = $conn->prepare('DELETE FROM findings WHERE reviewer_id = ?');
+    if ($delete_findings_stmt) {
+        $delete_findings_stmt->bind_param('i', $user_id);
+        $delete_findings_stmt->execute();
+        $delete_findings_stmt->close();
+    }
+
+    // Delete submission files and findings related to user's submissions
+    $sub_query = $conn->prepare('SELECT submission_id FROM submissions WHERE user_id = ?');
+    if ($sub_query) {
+        $sub_query->bind_param('i', $user_id);
+        $sub_query->execute();
+        $sub_result = $sub_query->get_result();
+        while ($row = $sub_result->fetch_assoc()) {
+            $sid = $row['submission_id'];
+            
+            // Delete findings for this submission
+            $del_f = $conn->prepare('DELETE FROM findings WHERE submission_id = ?');
+            $del_f->bind_param('i', $sid);
+            $del_f->execute();
+            $del_f->close();
+
+            // Delete submission files for this submission
+            $del_sf = $conn->prepare('DELETE FROM submission_files WHERE submission_id = ?');
+            $del_sf->bind_param('i', $sid);
+            $del_sf->execute();
+            $del_sf->close();
+
+            // Delete challenge comments for this submission
+            $del_cc = $conn->prepare('DELETE FROM Challenges_comments WHERE submission_id = ?');
+            $del_cc->bind_param('i', $sid);
+            $del_cc->execute();
+            $del_cc->close();
+        }
+        $sub_query->close();
+    }
+
+    // Delete file resources owned by user
+    $delete_files_stmt = $conn->prepare('DELETE FROM file_resources WHERE owner_id = ?');
+    if ($delete_files_stmt) {
+        $delete_files_stmt->bind_param('i', $user_id);
+        $delete_files_stmt->execute();
+        $delete_files_stmt->close();
+    }
+
+    // Delete audit logs
+    $delete_audit_stmt = $conn->prepare('DELETE FROM audit_logs WHERE user_id = ?');
+    if ($delete_audit_stmt) {
+        $delete_audit_stmt->bind_param('i', $user_id);
+        $delete_audit_stmt->execute();
+        $delete_audit_stmt->close();
+    }
+
+    // Delete attempt logs
+    $delete_attempts_stmt = $conn->prepare('DELETE FROM attempt_logs WHERE user_id = ?');
+    if ($delete_attempts_stmt) {
+        $delete_attempts_stmt->bind_param('i', $user_id);
+        $delete_attempts_stmt->execute();
+        $delete_attempts_stmt->close();
+    }
+
+    // Delete blocks
+    $delete_blocks_stmt = $conn->prepare('DELETE FROM blocks WHERE user_id = ?');
+    if ($delete_blocks_stmt) {
+        $delete_blocks_stmt->bind_param('i', $user_id);
+        $delete_blocks_stmt->execute();
+        $delete_blocks_stmt->close();
+    }
+
+    // Delete leaderboard entry
+    $delete_leaderboard_stmt = $conn->prepare('DELETE FROM leaderboard WHERE user_id = ?');
+    if ($delete_leaderboard_stmt) {
+        $delete_leaderboard_stmt->bind_param('i', $user_id);
+        $delete_leaderboard_stmt->execute();
+        $delete_leaderboard_stmt->close();
+    }
+
+    // Delete challenge comments (where user_id matches)
+    $delete_chal_comments_stmt = $conn->prepare('DELETE FROM Challenges_comments WHERE user_id = ?');
+    if ($delete_chal_comments_stmt) {
+        $delete_chal_comments_stmt->bind_param('i', $user_id);
+        $delete_chal_comments_stmt->execute();
+        $delete_chal_comments_stmt->close();
+    }
+
+    // Delete submissions
+    $delete_submissions_stmt = $conn->prepare('DELETE FROM submissions WHERE user_id = ? OR reviewer_id = ?');
+    if ($delete_submissions_stmt) {
+        $delete_submissions_stmt->bind_param('ii', $user_id, $user_id);
+        $delete_submissions_stmt->execute();
+        $delete_submissions_stmt->close();
+    }
+
+    // Delete lab instances
+    $delete_instances_stmt = $conn->prepare('DELETE FROM lab_instances WHERE user_id = ?');
+    if ($delete_instances_stmt) {
+        $delete_instances_stmt->bind_param('i', $user_id);
+        $delete_instances_stmt->execute();
+        $delete_instances_stmt->close();
+    }
     
     // Finally, delete the user
     $delete_user_stmt = $conn->prepare('DELETE FROM users WHERE user_id = ?');
@@ -139,9 +241,12 @@ try {
         'message' => 'Account deleted successfully'
     ]);
     
-} catch (Exception $e) {
+} catch (Throwable $e) {
     // Rollback transaction on error
-    $conn->rollback();
+    if (isset($conn) && $conn) {
+        $conn->rollback();
+    }
+    error_log("Delete Account Error: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
     echo json_encode([
         'success' => false,
         'message' => 'Failed to delete account: ' . $e->getMessage()
