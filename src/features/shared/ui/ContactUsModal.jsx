@@ -137,7 +137,16 @@ export default function ContactUsModal({ open, onClose }) {
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-md rounded-2xl border border-gray-700 bg-gray-900/95 p-6 shadow-2xl"
+        className="
+          relative
+          w-full max-w-sm
+          scale-95
+          rounded-2xl
+          border border-gray-700
+          bg-gray-900/95
+          p-5
+          shadow-2xl
+        "
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -146,96 +155,115 @@ export default function ContactUsModal({ open, onClose }) {
           onClick={onClose}
           aria-label="Close contact dialog"
         >
-          <X className="h-5 w-5" />
+          <X className="h-4 w-4" />
         </button>
-        <h2 id="contact-dialog-title" className="pr-10 font-mono text-lg font-bold text-green-400">
+  
+        <h2 className="pr-10 font-mono text-base font-bold text-green-400">
           // CONTACT_US
         </h2>
-        <p className="mt-1 font-mono text-sm text-gray-500">
+  
+        <p className="mt-1 font-mono text-xs text-gray-500">
           Send a message to the SuperAdmin team:
         </p>
-        <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
+  
+        <form className="mt-3 space-y-2.5" onSubmit={handleSubmit}>
+          
           <input
             type="text"
             required
             value={form.name}
             onChange={handleChange("name")}
             placeholder="Your name"
-            className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 font-mono text-sm text-gray-100 placeholder:text-gray-500 focus:border-green-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 font-mono text-sm text-gray-100 placeholder:text-gray-500 focus:border-green-500 focus:outline-none"
           />
+  
           <input
             type="email"
             required
             value={form.email}
             onChange={handleChange("email")}
             placeholder="Your email"
-            className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 font-mono text-sm text-gray-100 placeholder:text-gray-500 focus:border-green-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 font-mono text-sm text-gray-100 placeholder:text-gray-500 focus:border-green-500 focus:outline-none"
           />
+  
           <input
             type="text"
             required
             value={form.subject}
             onChange={handleChange("subject")}
             placeholder="Subject"
-            className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 font-mono text-sm text-gray-100 placeholder:text-gray-500 focus:border-green-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 font-mono text-sm text-gray-100 placeholder:text-gray-500 focus:border-green-500 focus:outline-none"
           />
+  
           <textarea
             required
-            rows={4}
+            rows={3}
             value={form.message}
             onChange={handleChange("message")}
             placeholder="Your message"
-            className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 font-mono text-sm text-gray-100 placeholder:text-gray-500 focus:border-green-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 font-mono text-sm text-gray-100 placeholder:text-gray-500 focus:border-green-500 focus:outline-none"
           />
-          <label className="block font-mono text-xs text-gray-400">
+  
+          <label className="block font-mono text-[10px] text-gray-400">
             CAPTCHA: {captchaQuestion || "Loading challenge..."}
           </label>
+  
           <input
             type="text"
             required
             value={captchaAnswer}
             onChange={(e) => setCaptchaAnswer(e.target.value)}
             placeholder="Enter captcha answer"
-            className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 font-mono text-sm text-gray-100 placeholder:text-gray-500 focus:border-green-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 font-mono text-sm text-gray-100 placeholder:text-gray-500 focus:border-green-500 focus:outline-none"
           />
+  
           <button
             type="submit"
             disabled={submitting || !captchaToken || !captchaQuestion}
-            className="w-full rounded-lg border border-green-600 bg-green-700/80 px-4 py-2 font-mono text-sm font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-lg border border-green-600 bg-green-700/80 px-4 py-1.5 font-mono text-sm font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {submitting ? "Sending..." : "Send to SuperAdmins"}
+            {submitting ? "Sending..." : "Send"}
           </button>
-          {submitMessage ? (
-            <p className="font-mono text-xs text-green-400">{submitMessage}</p>
-          ) : null}
-          {submitError ? (
-            <p className="font-mono text-xs text-red-400">{submitError}</p>
-          ) : null}
+  
+          {submitMessage && (
+            <p className="font-mono text-[10px] text-green-400">{submitMessage}</p>
+          )}
+  
+          {submitError && (
+            <p className="font-mono text-[10px] text-red-400">{submitError}</p>
+          )}
         </form>
+  
         {loading && (
-          <p className="mt-6 font-mono text-sm text-gray-400">Loading contacts…</p>
+          <p className="mt-4 font-mono text-xs text-gray-400">Loading contacts…</p>
         )}
+  
         {!loading && error && (
-          <p className="mt-4 font-mono text-sm text-red-400">{error}</p>
+          <p className="mt-3 font-mono text-xs text-red-400">{error}</p>
         )}
+  
         {!loading && !error && contacts.length === 0 && (
-          <p className="mt-4 font-mono text-sm text-gray-400">
+          <p className="mt-3 font-mono text-xs text-gray-400">
             No SuperAdmin contacts are available right now.
           </p>
         )}
+  
         {!loading && contacts.length > 0 && (
-          <ul className="mt-4 space-y-3">
+          <ul className="mt-3 space-y-2">
             {contacts.map((c, i) => (
               <li
                 key={`${c.email}-${i}`}
-                className="rounded-lg border border-gray-700 bg-gray-800/50 px-3 py-3"
+                className="rounded-lg border border-gray-700 bg-gray-800/50 px-3 py-2"
               >
-                {c.username ? (
-                  <div className="mb-1 font-mono text-xs text-gray-400">{c.username}</div>
-                ) : null}
+                {c.username && (
+                  <div className="mb-1 font-mono text-[10px] text-gray-400">
+                    {c.username}
+                  </div>
+                )}
+  
                 <a
                   href={`mailto:${encodeURIComponent(c.email)}`}
-                  className="break-all font-mono text-sm text-green-400 hover:underline"
+                  className="break-all font-mono text-xs text-green-400 hover:underline"
                 >
                   {c.email}
                 </a>
