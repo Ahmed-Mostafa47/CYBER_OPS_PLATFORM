@@ -459,7 +459,7 @@ function handle_put_request(PdoMysqliShim $conn)
         }
         
         // Assign new role using the new role-based system
-        $roleAssigned = assignRole($conn, $userId, $requested_role, null);
+        $roleAssigned = assignRole($conn, $userId, $requested_role, $actorUserId);
         
         if (!$roleAssigned) {
             ob_clean();

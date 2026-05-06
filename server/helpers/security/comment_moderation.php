@@ -2,10 +2,11 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../core/db/pdo_mysqli_shim.php';
+require_once __DIR__ . '/../../core/utils/load_env.php';
 require_once __DIR__ . '/../../helpers/security/comment_moderation_local.php';
 
 /**
- * OpenAI Moderation API (primary) + Google Perspective API (fallback)
+ * Google Gemini API (primary) + Google Perspective API (fallback)
  * + always-on local wordlist (works without API keys).
  */
 
@@ -35,19 +36,7 @@ function hackme_moderate_comment_text(string $text): array
     }
 
     $cfg = require __DIR__ . '/../../core/config/moderation.php';
-    $openai = trim((string) ($cfg['openai_api_key'] ?? ''));
-    if ($openai !== '') {
-        $r = hackme_openai_moderate($text, $openai);
-        if ($r['ok']) {
-            return [
-                'flagged' => $r['flagged'],
-                'provider' => 'openai',
-                'detail' => $r['detail'] ?? '',
-            ];
-        }
-        error_log('OpenAI moderation failed: ' . ($r['error'] ?? 'unknown'));
-    }
-
+    
     $persp = trim((string) ($cfg['perspective_api_key'] ?? ''));
     if ($persp !== '') {
         $threshold = (float) ($cfg['perspective_threshold'] ?? 0.72);
@@ -62,33 +51,100 @@ function hackme_moderate_comment_text(string $text): array
         error_log('Perspective moderation failed: ' . ($r['error'] ?? 'unknown'));
     }
 
+    $gemini = trim((string) ($cfg['gemini_api_key'] ?? ''));
+    if ($gemini !== '') {
+        $r = hackme_gemini_moderate($text, $gemini);
+        if ($r['ok']) {
+            return [
+                'flagged' => $r['flagged'],
+                'provider' => 'gemini',
+                'detail' => $r['detail'] ?? '',
+            ];
+        }
+        error_log('Gemini moderation failed: ' . ($r['error'] ?? 'unknown'));
+    }
+
     return ['flagged' => false, 'provider' => 'none', 'detail' => 'clean'];
 }
 
 /**
  * @return array{ok:bool, flagged:bool, detail?:string, error?:string}
  */
-function hackme_openai_moderate(string $text, string $apiKey): array
+
+/**
+ * @return array{ok:bool, flagged:bool, detail?:string, error?:string}
+ */
+function hackme_gemini_moderate(string $text, string $apiKey): array
 {
+    // Use gemini-flash-lite-latest - it might have higher limits
+    $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=' . rawurlencode($apiKey);
+    
+    $prompt = "You are a strict content moderator for an educational Cybersecurity platform. 
+    Analyze the following comment and determine if it violates community standards.
+    
+    VIOLATIONS INCLUDE:
+    - Profanity or vulgar language (STRICTLY focus on Egyptian Arabic slang/insults, even the hidden ones).
+    - Hate speech, racism, or religious insults.
+    - Harassment, cyber-bullying, or making fun of others' intelligence/skills.
+    - Telling someone they are a 'failure', 'stupid', or that they 'don't belong' here.
+    - Any negative comment meant to discourage or demean a student.
+    - Explicit sexual content or suggestive language.
+    - Extreme toxicity or aggressive behavior.
+    
+    CRITICAL: Be very strict. Even mild insults or slang used to offend others should be flagged.
+    
+    RESPONSE FORMAT:
+    - If it violates any rule: Respond ONLY with 'flagged: [reason in English]'
+    - If it is 100% safe: Respond ONLY with 'clean'
+    
+    Comment to analyze: \"$text\"";
+
     $payload = json_encode([
-        'model' => 'text-moderation-latest',
-        'input' => $text,
+        'contents' => [
+            ['parts' => [['text' => $prompt]]]
+        ],
+        'generationConfig' => [
+            'temperature' => 0.0,
+            'maxOutputTokens' => 60
+        ],
+        'safetySettings' => [
+            ['category' => 'HARM_CATEGORY_HARASSMENT', 'threshold' => 'BLOCK_LOW_AND_ABOVE'],
+            ['category' => 'HARM_CATEGORY_HATE_SPEECH', 'threshold' => 'BLOCK_LOW_AND_ABOVE'],
+            ['category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold' => 'BLOCK_LOW_AND_ABOVE'],
+            ['category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_LOW_AND_ABOVE']
+        ]
     ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 
-    $ch = curl_init('https://api.openai.com/v1/moderations');
-    curl_setopt_array($ch, [
-        CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => [
-            'Content-Type: application/json',
-            'Authorization: Bearer ' . $apiKey,
-        ],
-        CURLOPT_POSTFIELDS => $payload,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 20,
-    ]);
-    $body = curl_exec($ch);
-    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    $maxRetries = 2;
+    $attempt = 0;
+    $body = false;
+    $code = 0;
+
+    while ($attempt <= $maxRetries) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
+        ]);
+        
+        $body = curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($code !== 429) {
+            break;
+        }
+
+        $attempt++;
+        if ($attempt <= $maxRetries) {
+            error_log("Gemini hit 429, retrying in 2 seconds... (Attempt $attempt)");
+            sleep(2);
+        }
+    }
 
     if ($body === false || $code < 200 || $code >= 300) {
         return ['ok' => false, 'flagged' => false, 'error' => 'http_' . $code];
@@ -99,18 +155,15 @@ function hackme_openai_moderate(string $text, string $apiKey): array
         return ['ok' => false, 'flagged' => false, 'error' => 'invalid_json'];
     }
 
-    $flagged = (bool) ($json['results'][0]['flagged'] ?? false);
-    $cats = [];
-    if (isset($json['results'][0]['categories']) && is_array($json['results'][0]['categories'])) {
-        foreach ($json['results'][0]['categories'] as $k => $v) {
-            if ($v) {
-                $cats[] = (string) $k;
-            }
-        }
-    }
-    $detail = $cats !== [] ? implode(', ', $cats) : '';
+    $responseContent = $json['candidates'][0]['content']['parts'][0]['text'] ?? '';
+    $responseContent = trim(strtolower($responseContent));
 
-    return ['ok' => true, 'flagged' => $flagged, 'detail' => $detail];
+    if (strpos($responseContent, 'flagged') !== false) {
+        $detail = str_replace('flagged:', '', $responseContent);
+        return ['ok' => true, 'flagged' => true, 'detail' => trim($detail)];
+    }
+
+    return ['ok' => true, 'flagged' => false, 'detail' => 'clean'];
 }
 
 /**
@@ -139,7 +192,7 @@ function hackme_perspective_moderate(string $text, string $apiKey, float $thresh
         CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
         CURLOPT_POSTFIELDS => $payload,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 20,
+        CURLOPT_TIMEOUT => 30,
     ]);
     $body = curl_exec($ch);
     $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);

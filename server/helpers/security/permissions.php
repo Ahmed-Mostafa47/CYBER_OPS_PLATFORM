@@ -203,21 +203,37 @@ function assignRole(PdoMysqliShim $conn, int $userId, string $roleName, ?int $as
     $roleId = (int)$role['role_id'];
     
     // Insert into user_roles
-    $insertStmt = $conn->prepare("
-        INSERT INTO user_roles (user_id, role_id, assigned_by)
-        VALUES (?, ?, ?)
-        ON DUPLICATE KEY UPDATE assigned_by = VALUES(assigned_by)
-    ");
+    // Use NULL if $assignedBy is not set to avoid foreign key errors (don't pass 0)
+    if ($assignedBy === null) {
+        $insertStmt = $conn->prepare("
+            INSERT INTO user_roles (user_id, role_id, assigned_by, assigned_at)
+            VALUES (?, ?, NULL, CURRENT_TIMESTAMP)
+            ON DUPLICATE KEY UPDATE assigned_at = CURRENT_TIMESTAMP
+        ");
+        if (!$insertStmt) {
+            error_log('Failed to prepare user_roles insert (null assigned_by): ' . $conn->error);
+            return false;
+        }
+        $insertStmt->bind_param('ii', $userId, $roleId);
+    } else {
+        $insertStmt = $conn->prepare("
+            INSERT INTO user_roles (user_id, role_id, assigned_by, assigned_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON DUPLICATE KEY UPDATE assigned_by = VALUES(assigned_by), assigned_at = CURRENT_TIMESTAMP
+        ");
+        if (!$insertStmt) {
+            error_log('Failed to prepare user_roles insert: ' . $conn->error);
+            return false;
+        }
+        $insertStmt->bind_param('iii', $userId, $roleId, $assignedBy);
+    }
+    $success = $insertStmt->execute();
     
-    if (!$insertStmt) {
-        error_log('Failed to prepare user_roles insert: ' . $conn->error);
-        return false;
+    if (!$success) {
+        error_log("assignRole execution failed for user $userId, role $roleId: " . $insertStmt->error);
     }
     
-    $insertStmt->bind_param('iii', $userId, $roleId, $assignedBy);
-    $success = $insertStmt->execute();
     $insertStmt->close();
-    
     return $success;
 }
 
