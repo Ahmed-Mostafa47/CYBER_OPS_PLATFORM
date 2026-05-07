@@ -1,213 +1,126 @@
-# HackMe - Gamified Cybersecurity Training Platform
+# 🛡️ HackMe - Gamified Cybersecurity Training Platform
 
-HackMe is a graduation project platform for practical cybersecurity learning through controlled labs, exploit-driven scenarios, and measurable progress tracking.
+![HackMe Banner](./public/banner.png)
 
-It combines:
-- Hands-on white-box and black-box training labs
-- Role-based workflows (User/Instructor/Admin/SuperAdmin)
-- Scoring and leaderboard progression
-- Security monitoring dashboards and audit trails
-
-## Description
-
-Cybersecurity students often struggle to connect theoretical concepts with real attack/defense workflows.  
-HackMe solves this by providing a structured web platform where learners interact with realistic vulnerability scenarios in a safe environment, while instructors and admins can monitor performance and security events.
-
-## Features
-
-- User registration, login, email verification, and password management
-- Role request and role-based access control
-- Lab browsing by type and category
-- Flag-based and exploit-based solve flows
-- Points calculation and leaderboard ranking
-- Comments and engagement features
-- Notification system (persistent + optional real-time push)
-- Security attempt logs, audit logs, and security dashboard
-
-## Tech Stack
-
-- Frontend: React, React Router, Vite, TailwindCSS, Axios
-- Backend: PHP (API/Auth), MySQL
-- Real-time notifications (optional): Node.js + Socket.IO
-- Infrastructure: Docker Compose (labs/services), local scripts
+Welcome to **HackMe**, a comprehensive graduation project platform designed for practical cybersecurity learning. This platform provides hands-on experience through controlled labs, exploit-driven scenarios, and a real-time progress tracking system.
 
 ---
 
-## Prerequisites
+## 🏗️ Project Architecture
 
-### Languages and Runtime Versions
-- Node.js `>= 18`
-- npm `>= 9`
-- PHP `>= 8.1`
-- MySQL `>= 8.0` (or compatible MariaDB)
+The project is split into two main repositories that work together:
 
-### Required Tools
-- Git
-- Composer
-- XAMPP/WAMP/LAMP or any PHP+MySQL stack
-- Optional: Docker + Docker Compose (for labs/services)
-
-### OS Requirements
-- Windows 10/11, Linux, or macOS
+1.  **Platform Core (This Repo):** The central hub for user management, leaderboards, scoring, and lab navigation.
+2.  **Labs Repository:** A separate repository containing all the containerized labs (SQLi, XSS, CSRF, etc.).
 
 ---
 
-## Installation
+## 🚀 Getting Started
 
-1. Clone repository
-```bash
-git clone <YOUR_REPO_URL>
-cd HackMe
-```
+To fully set up the platform, you need to follow the installation steps for both the **Platform** and the **Labs**.
 
-2. Install frontend dependencies
-```bash
-npm install
-```
+### 1️⃣ Part 1: Platform Setup (Main Repository)
 
-3. Install PHP dependencies (auth mailer)
-```bash
-composer install
-```
+This repository contains the Frontend (React), Backend (PHP), and Notification Server (Node.js).
 
-4. Install notification server dependencies (optional)
-```bash
-cd notification-server
-npm install
-cd ..
-```
+#### Prerequisites
+*   **XAMPP / WAMP / LAMP** (PHP 8.1+, MySQL 8.0+)
+*   **Node.js** (v18+) & **npm**
+*   **Composer** (for PHP dependencies)
 
----
-
-## Environment Setup
-
-### 1) Frontend Environment
-
-Create `.env` in project root:
-```env
-VITE_API_BASE=http://localhost/HackMe/server/api
-```
-
-### 2) Backend Database Setup
-
-1. Create database `ctf_platform` (utf8mb4 collation).
-2. Import core SQL schema/migrations.
-3. Ensure backend connection settings match your local DB host/user/pass/port.
-
-Suggested import order:
-- `server/sql/ctf_platform.sql` (or your current core schema file)
-- Additional migration files in `server/sql/` as needed for your setup.
-
-### 3) Mail and Notification Setup (Optional)
-
-- Configure SMTP credentials for email verification/reset if required.
-- Start notification-server if you want real-time push notifications.
+#### Installation Steps
+1.  **Clone the Platform Repository:**
+    ```bash
+    git clone https://github.com/Ahmed-Mostafa47/CYBER_OPS_PLATFORM.git
+    cd HackMe
+    ```
+2.  **Install Frontend Dependencies:**
+    ```bash
+    npm install
+    ```
+3.  **Install PHP Dependencies:**
+    ```bash
+    composer install
+    ```
+4.  **Configure Environment Variables:**
+    *   Rename `.env.example` to `.env`.
+    *   Update your Database credentials (`DB_HOST`, `DB_USER`, `DB_PASS`, etc.).
+    *   Update `MAIL_` settings for email verification features.
+5.  **Database Setup:**
+    *   Open phpMyAdmin and create a database named `ctf_platform`.
+    *   Import the SQL schema located at `server/sql/ctf_platform.sql`.
+6.  **Run the Platform:**
+    *   Start **Apache** and **MySQL** in XAMPP.
+    *   Start the React development server:
+        ```bash
+        npm run dev
+        ```
+    *   *(Optional)* Start the Notification Server:
+        ```bash
+        cd notification-server
+        node server.js
+        ```
 
 ---
 
-## Build / Compilation
+### 2️⃣ Part 2: Labs Setup (The "Other" Repository)
 
-### Frontend Production Build
-```bash
-npm run build
-```
+The labs are hosted in a separate repository to keep the environment isolated and manageable via Docker.
 
-### Preview Built Frontend
-```bash
-npm run preview
-```
-
----
-
-## Run Instructions
-
-### Option A: Local Development
-
-1. Start Apache + MySQL (XAMPP or equivalent).
-2. Start frontend:
-```bash
-npm run dev
-```
-3. Optional: start notification service
-```bash
-cd notification-server
-node server.js
-```
-
-Frontend usually runs on:
-- `http://localhost:5173`
-
-Backend should be reachable at:
-- `http://localhost/HackMe/server/`
-
-### Option B: Containerized Lab Runtime
-
-For lab families that provide compose files:
-```bash
-docker compose up -d
-```
+#### Installation Steps
+1.  **Go to the Labs Repository:**
+    Navigate to [ABDOHAMDA/Labs](https://github.com/ABDOHAMDA/Labs) on GitHub.
+2.  **Clone the Labs Repository:**
+    ```bash
+    # Move outside the HackMe directory first
+    cd ..
+    git clone https://github.com/ABDOHAMDA/Labs.git
+    cd Labs
+    ```
+3.  **Deploy a Lab:**
+    Each lab folder (e.g., `SQL`, `XSS`) contains its own environment. Most labs use Docker for easy setup.
+    *   Navigate to a specific lab:
+        ```bash
+        cd SQL
+        ```
+    *   Start the lab environment:
+        ```bash
+        docker compose up -d
+        ```
+4.  **Solving Labs:**
+    *   Once the lab is running, it will be accessible at a specific port (e.g., `http://localhost:8080`).
+    *   Solve the challenge and get the **Flag**.
+    *   Submit the flag in the **HackMe Platform** (running on `http://localhost:5173`) to earn points!
 
 ---
 
-## Deployment (Bonus)
-
-### Docker
-- Containerize frontend and backend services separately.
-- Use docker-compose for multi-service orchestration (frontend, PHP API, DB, optional notification service).
-- Add health checks and restart policies.
-
-### Vercel / Netlify
-- Suitable for frontend-only hosting.
-- Backend PHP APIs should be hosted separately (VPS/shared hosting/container platform).
-
-### CI/CD Suggestions
-- Use GitHub Actions pipeline:
-  1. Install dependencies
-  2. Run lint/build checks
-  3. Run PHP syntax checks
-  4. Build artifacts
-  5. Deploy to staging/production
-
----
-
-## Folder Structure Explanation
+## 📁 Directory Structure
 
 ```text
 HackMe/
-  src/                         # React frontend app
-    features/                  # Feature modules (auth, labs, dashboard, profile...)
-    hooks/                     # Custom React hooks
-    services/                  # Frontend API services
-  server/
-    auth/                      # Authentication endpoints
-    api/                       # Core API endpoints
-    utils/                     # Shared backend helpers (db, security, permissions...)
-    sql/                       # SQL schemas/migrations
-  notification-server/         # Node + Socket.IO real-time notifications
-  scripts/                     # Utility scripts
-  public/                      # Static assets
-  README.md
+├── src/                # React Frontend (UI, Components, Pages)
+├── server/             # PHP Backend (API, Auth, Logic)
+│   ├── api/            # API Endpoints
+│   ├── core/           # Database & Core helpers
+│   └── sql/            # Database migrations
+├── notification-server/# Node.js Socket.IO server
+└── public/             # Static assets (Images, Banners)
 ```
 
 ---
 
-## Beginner Quick Start
+## 🛠️ Troubleshooting
 
-1. Install Node, PHP, MySQL, Composer.
-2. Clone repo and run `npm install`.
-3. Import DB schema into `ctf_platform`.
-4. Configure backend DB credentials.
-5. Run `npm run dev`.
-6. Open `http://localhost:5173`.
-
-If any step fails, check:
-- Apache/MySQL running
-- Correct DB credentials
-- API URL in `.env`
-- Browser network tab for failing endpoint
+*   **API Connection Error:** Ensure the `VITE_API_BASE` in your frontend code (or `.env`) matches your local XAMPP path (e.g., `http://localhost/HackMe/server/api`).
+*   **Database Errors:** Verify that the database name in `.env` matches the one created in phpMyAdmin.
+*   **Lab Not Accessible:** Make sure Docker Desktop is running before executing `docker compose up`.
 
 ---
 
-## License
+## 🎓 Contributors
+*   **Graduation Project Team** - Faculty of Computers and Artificial Intelligence.
 
-Academic project license as defined by the project team/repository owner.
+---
+
+### 🌟 Project Status: Active Development
+For any issues, please open an issue in the respective repository.
