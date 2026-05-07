@@ -72,7 +72,13 @@ $localInput = trim((string) ($input['client_local_ip'] ?? $input['local_ipv4'] ?
 $clientTimeUtc = trim((string) ($input['client_time_utc'] ?? ''));
 $clientTimezone = trim((string) ($input['client_timezone'] ?? ''));
 $clientTzOffsetMinutes = isset($input['client_tz_offset_minutes']) ? (int) $input['client_tz_offset_minutes'] : null;
-
+if ($userId < 1 && $accessToken !== '' && $labId >= 1) {
+    $atEsc = $conn->real_escape_string($accessToken);
+    $labIdInt = (int) $labId;
+    $tr = $conn->query(
+        "SELECT user_id, client_ip, device_bind, client_mac, client_local_ip FROM lab_access_tokens WHERE token = '$atEsc' AND lab_id = $labIdInt " .
+        "AND used_at IS NULL AND expires_at > NOW() LIMIT 1"
+    );
     if ($tr && ($trow = $tr->fetch_assoc())) {
         $rawUid = (int)($trow['user_id'] ?? 0);
         if ($rawUid > 0) {
@@ -199,7 +205,7 @@ if ($isLab18) {
     if (!is_array($meta) || empty($meta['files']) || !is_array($meta['files'])) {
         $meta = hackme_whitebox_lab19_meta();
     }
-} elseif ($isSqlWb) {
+} elseif ($isSqlWb || $isLab12) {
     $meta = null;
     $rawMeta = $chRow !== null ? trim((string) ($chRow['whitebox_files_ref'] ?? '')) : '';
     if ($rawMeta !== '') {
@@ -241,13 +247,18 @@ if ($chRow === null) {
 
 $allowed = null;
 $expectedLine = null;
+
+// Normalize incoming source file
+$sourceFileClean = strtolower(ltrim(str_replace('\\', '/', $sourceFile), '/'));
+
 foreach ($meta['files'] as $f) {
     if (!is_array($f)) {
         continue;
     }
     $rel = trim((string) ($f['relative_path'] ?? $f['path'] ?? ''));
-    $rel = str_replace('\\', '/', $rel);
-    if ($rel === $sourceFile || $rel === ltrim($sourceFile, '/')) {
+    $relClean = strtolower(ltrim(str_replace('\\', '/', $rel), '/'));
+
+    if ($relClean === $sourceFileClean) {
         $allowed = $rel;
         $expectedLine = isset($f['vulnerable_line']) ? (int) $f['vulnerable_line'] : null;
         break;
