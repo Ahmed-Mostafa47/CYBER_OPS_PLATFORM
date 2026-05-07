@@ -316,7 +316,7 @@ foreach ($meta['files'] as $f) {
     }
     $useStub = false;
     $content = '';
-    if (($isSqlWb || $isAccessWb || $isXssWb) && ($labRoot === null || !is_dir($labRoot))) {
+    if (($isSqlWb || $isXssWb) && ($labRoot === null || !is_dir($labRoot)) || $isAccessWb) {
         $useStub = true;
     } else {
         $abs = realpath($labRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rel));

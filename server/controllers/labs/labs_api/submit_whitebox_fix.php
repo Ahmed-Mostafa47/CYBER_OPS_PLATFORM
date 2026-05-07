@@ -306,20 +306,8 @@ if ($labRoot === null && !$isAccessWb && !$isSqlWb && !$isXssWb) {
 $original = '';
 if ($isLab18) {
     $original = hackme_whitebox_lab18_stub_source();
-    if ($labRoot !== null && is_dir($labRoot)) {
-        $absTry = realpath($labRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $allowed));
-        if ($absTry !== false && hackme_path_is_under_lab_root($absTry, $labRoot) && is_readable($absTry) && is_file($absTry)) {
-            $original = (string) file_get_contents($absTry);
-        }
-    }
 } elseif ($isLab19) {
     $original = hackme_whitebox_lab19_stub_for_relative_path($allowed);
-    if ($labRoot !== null && is_dir($labRoot)) {
-        $absTry = realpath($labRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $allowed));
-        if ($absTry !== false && hackme_path_is_under_lab_root($absTry, $labRoot) && is_readable($absTry) && is_file($absTry)) {
-            $original = (string) file_get_contents($absTry);
-        }
-    }
 } elseif ($isSqlWb) {
     $original = hackme_whitebox_lab1_stub_login_source();
     if ($labRoot !== null && is_dir($labRoot)) {
