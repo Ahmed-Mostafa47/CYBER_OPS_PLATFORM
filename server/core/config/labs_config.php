@@ -4,7 +4,7 @@
  * LABS_BASE_PATH: Root folder containing all Training Labs (e.g. D:\Graduation_project\Training Labs).
  * If this path is wrong or missing SQL/, white-box lab 1 still loads using an embedded api/login.php sample.
  */
-define('LABS_BASE_PATH', 'E:\\Level 4\\Semester1\\graduation\\Labs');
+define('LABS_BASE_PATH', 'C:\Users\ahmed\Desktop\4th cs\Labs');
 
 /** White-box SQL source lab (separate from black-box SQL lab_id = 1). */
 define('HACKME_WHITEBOX_SQL_LAB_ID', 11);

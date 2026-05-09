@@ -117,6 +117,20 @@ if (!hackme_lab_token_bind_row_matches($row, [
         'success' => false,
         'message' => 'LAB_TOKEN_BIND_MISMATCH',
         'data' => ['points_earned' => 0],
+        'debug' => [
+            'row' => [
+                'client_ip' => $row['client_ip'] ?? '',
+                'device_bind' => $row['device_bind'] ?? '',
+                'client_mac' => $row['client_mac'] ?? '',
+                'client_local_ip' => $row['client_local_ip'] ?? ''
+            ],
+            'req' => [
+                'ip' => hackme_request_client_ip(),
+                'device_bind' => $deviceBindInput,
+                'mac_address' => $macInput,
+                'client_local_ip' => $localInput
+            ]
+        ]
     ]);
     exit;
 }
