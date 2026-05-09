@@ -83,7 +83,11 @@ function hackme_lab_token_bind_row_matches(array $row, array $req): bool
     $rlc = hackme_normalize_client_local_ip((string) ($req['client_local_ip'] ?? ''));
 
     if ($sip !== '' && strcasecmp($sip, $rip) !== 0) {
-        return false;
+        $isLocalSip = in_array($sip, ['127.0.0.1', '::1'], true);
+        $isLocalRip = in_array($rip, ['127.0.0.1', '::1'], true);
+        if (!$isLocalSip || !$isLocalRip) {
+            return false;
+        }
     }
     if ($sbd !== '') {
         if ($rbd === '' || !hash_equals($sbd, $rbd)) {
