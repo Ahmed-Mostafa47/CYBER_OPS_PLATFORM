@@ -34,15 +34,3 @@ server/config/moderation.local.php
 /cypress/videos/
 /cypress/screenshots/
 
-# Vitest
-# Local cleanup and scratch files
-trash/
-scratch/
-debug_paths.txt
-fix_wb_db.php
-sync_labs.php
-check_meta.php
-check_lab11.php
-debug_wb.php
-check_submissions.php
-test_lint.php
