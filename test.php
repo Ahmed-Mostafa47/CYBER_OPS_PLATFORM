@@ -1,0 +1,1 @@
+<?php $_SERVER['REQUEST_METHOD'] = 'GET'; $_SERVER['REMOTE_ADDR'] = '127.0.0.1'; $_GET = ['lab_id' => 1, 'user_id' => 1, 'device_bind' => '123456789012345678901234', 'mac_address' => 'AA:BB:CC:DD:EE:FF', 'client_local_ip' => '192.168.1.5']; include 'server/controllers/labs/generate_lab_token.php';
