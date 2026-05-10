@@ -43,7 +43,7 @@ const diffBadgeClasses = {
 };
 
 const whiteboxRouteLabIds = new Set(WHITEBOX_WORKBENCH_LAB_IDS);
-const noManualSubmitLabIds = new Set([1, 5, 7, 10, 30, 40, 41, 42]);
+// const noManualSubmitLabIds = new Set([1, 5, 7, 10, 30, 40, 41, 42]);
 
 const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
   const navigate = useNavigate();
