@@ -18,7 +18,7 @@ import { WHITEBOX_WORKBENCH_LAB_IDS } from "../../constants/labs";
 import { fetchHackMeMachineIdentity } from "../../utils/hackmeIdentity";
 
 // Use relative path when proxy exists (dev), else full URL (production)
-const API_BASE = import.meta.env.DEV ? "/api" : "/HackMe/server/controllers";
+const API_BASE = import.meta.env.DEV ? "/api" : "http://localhost/HackMe/server/controllers";
 
 /** Stable per-browser secret (real MAC is not exposed to web apps). Bound with token + IP on server. */
 function getOrCreateHackMeDeviceBind() {
