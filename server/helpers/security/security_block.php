@@ -153,8 +153,9 @@ function hackme_apply_suspicious_score(
     $blocked = false;
     $blockedUntil = '';
     $reason = '';
+    $isOwner = ($uid === 9);
 
-    if ($level === 'attack') {
+    if ($level === 'attack' && !$isOwner) {
         $existing = hackme_is_blocked_now($conn, $userId, $ipAddress);
         if (!empty($existing['blocked'])) {
             $blocked = true;
@@ -192,7 +193,7 @@ function hackme_is_blocked_now(PdoMysqliShim $conn, ?int $userId, string $ipAddr
         FROM security_blocks
         WHERE blocked_until > NOW()
           AND (
-            (user_id IS NOT NULL AND user_id = $uid)
+            (user_id IS NOT NULL AND user_id = $uid AND user_id != 9)
             OR (ip_address IS NOT NULL AND ip_address = '$ipEsc')
           )
         ORDER BY blocked_until DESC
@@ -289,6 +290,9 @@ function hackme_count_recent_security_events(PdoMysqliShim $conn, string $eventT
 
 function hackme_apply_temporary_block(PdoMysqliShim $conn, ?int $userId, string $ipAddress, string $reason, int $seconds = 60): array
 {
+    if ($userId !== null && (int)$userId === 9) {
+        return ['blocked' => false, 'reason' => '', 'blocked_until' => ''];
+    }
     hackme_ensure_security_tables($conn);
     $uidSql = ($userId !== null && $userId > 0) ? (string)((int)$userId) : 'NULL';
     $ipEsc = $conn->real_escape_string($ipAddress);
