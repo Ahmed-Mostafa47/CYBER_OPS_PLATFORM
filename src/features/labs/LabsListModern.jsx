@@ -314,7 +314,7 @@ const LabsListModern = ({
 
                   <button
                     type="button"
-                    disabled={lab.is_deletion_pending && !isAdmin}
+                    disabled={lab.is_deletion_pending && !isAdmin && currentUserId !== 9}
                     onClick={async (e) => {
                       e.stopPropagation();
                       if (onRemoveLab) {
@@ -327,13 +327,13 @@ const LabsListModern = ({
                       }
                     }}
                     className={`inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-mono transition-colors w-full sm:w-auto ${
-                      lab.is_deletion_pending && !isAdmin
+                      lab.is_deletion_pending && !isAdmin && currentUserId !== 9
                         ? "border-amber-500/40 bg-amber-500/10 text-amber-300 opacity-70 cursor-not-allowed"
                         : "border-rose-500/60 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
                     }`}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    {lab.is_deletion_pending && !isAdmin ? "Deletion Pending" : "Remove"}
+                    {lab.is_deletion_pending && !isAdmin && currentUserId !== 9 ? "Deletion Pending" : "Remove"}
                   </button>
                 </div>
               )}

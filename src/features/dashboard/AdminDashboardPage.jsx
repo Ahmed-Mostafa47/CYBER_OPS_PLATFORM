@@ -334,6 +334,13 @@ const AdminDashboardPage = ({
       icon: Shield,
       gradient: "from-purple-600 to-purple-700",
     },
+    {
+      label: "LAB_DELETION_REQUESTS",
+      value: labDeletionRequests.length,
+      icon: Trash2,
+      gradient: "from-red-600 to-red-700",
+      highlight: labDeletionRequests.length > 0
+    },
   ];
 
   return (
@@ -383,7 +390,18 @@ const AdminDashboardPage = ({
             return (
               <div
                 key={stat.label}
-                className="bg-gray-900/70 border border-gray-700 rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 shadow-xl"
+                onClick={() => {
+                  if (stat.label === "LAB_DELETION_REQUESTS") {
+                    document.getElementById("lab-deletion-requests")?.scrollIntoView({ behavior: "smooth" });
+                  } else if (stat.label === "PENDING_ROLE_REQUESTS") {
+                    document.getElementById("role-requests")?.scrollIntoView({ behavior: "smooth" });
+                  }
+                }}
+                className={`bg-gray-900/70 border rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 shadow-xl transition-all cursor-pointer hover:bg-gray-800/80 ${
+                  stat.highlight 
+                    ? "border-red-500/50 shadow-red-500/10 animate-pulse" 
+                    : "border-gray-700 shadow-xl"
+                }`}
               >
                 <div
                   className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center mb-3 sm:mb-4 border border-white/20`}
@@ -391,9 +409,14 @@ const AdminDashboardPage = ({
                   <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
                 <p className="text-xs sm:text-sm text-gray-500 font-mono">{stat.label}</p>
-                <p className="text-2xl sm:text-3xl font-bold text-white font-mono">
-                  {stat.value}
-                </p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-2xl sm:text-3xl font-bold text-white font-mono">
+                    {stat.value}
+                  </p>
+                  {stat.highlight && (
+                    <span className="text-[10px] text-red-400 font-bold animate-bounce">NEW</span>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -626,7 +649,7 @@ const AdminDashboardPage = ({
           )}
         </div>
 
-        <div className="bg-gray-900/70 border border-gray-800 rounded-2xl p-6 shadow-2xl">
+        <div className="bg-gray-900/70 border border-gray-800 rounded-2xl p-6 shadow-2xl" id="role-requests">
           <div className="flex items-center gap-3 mb-6">
             <Activity className="w-5 h-5 text-green-400" />
             <h2 className="text-2xl font-bold text-white font-mono">
@@ -766,13 +789,19 @@ const AdminDashboardPage = ({
           )}
         </div>
 
-        {/* Lab Deletion Requests Section */}
-        <div className="bg-gray-900/70 border border-gray-800 rounded-2xl p-6 shadow-2xl mt-6">
-          <div className="flex items-center gap-3 mb-6">
-            <Trash2 className="w-5 h-5 text-red-400" />
-            <h2 className="text-2xl font-bold text-white font-mono">
-              LAB_DELETION_REQUESTS
-            </h2>
+        <div className="bg-gray-900/70 border border-gray-800 rounded-2xl p-6 shadow-2xl mt-6" id="lab-deletion-requests">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <Trash2 className={`w-5 h-5 ${labDeletionRequests.length > 0 ? "text-red-400 animate-pulse" : "text-gray-400"}`} />
+              <h2 className="text-2xl font-bold text-white font-mono">
+                LAB_DELETION_REQUESTS
+              </h2>
+            </div>
+            {labDeletionRequests.length > 0 && (
+              <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-bounce">
+                {labDeletionRequests.length} NEW
+              </span>
+            )}
           </div>
 
           {labDeletionRequests.length === 0 ? (
