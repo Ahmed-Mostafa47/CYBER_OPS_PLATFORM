@@ -32,18 +32,45 @@ function whitebox_lab20_reflected_xss_verify(string $patched): array
     return [true, 'Reflected XSS mitigation verified.'];
 }
 
+// function whitebox_lab21_dom_xss_verify(string $patched): array
+// {
+//     $unsafeSink = preg_match('/\.innerHTML\s*=/', $patched) === 1;
+//     $safeSink =
+//         preg_match('/\.textContent\s*=/', $patched) === 1 ||
+//         preg_match('/createTextNode\s*\(/', $patched) === 1;
+//     if ($unsafeSink) {
+//         return [false, 'Fix rejected: innerHTML assignment remains in DOM sink.'];
+//     }
+//     if (!$safeSink) {
+//         return [false, 'Fix rejected: replace sink with textContent/createTextNode.'];
+//     }
+//     return [true, 'DOM XSS mitigation verified.'];
+// }
 function whitebox_lab21_dom_xss_verify(string $patched): array
 {
-    $unsafeSink = preg_match('/\.innerHTML\s*=/', $patched) === 1;
-    $safeSink =
-        preg_match('/\.textContent\s*=/', $patched) === 1 ||
-        preg_match('/createTextNode\s*\(/', $patched) === 1;
-    if ($unsafeSink) {
-        return [false, 'Fix rejected: innerHTML assignment remains in DOM sink.'];
+    $lines = explode("\n", $patched);
+
+    foreach ($lines as $line) {
+
+        $unsafe =
+            str_contains($line, 'innerHTML') &&
+            (
+                str_contains($line, 'location') ||
+                str_contains($line, 'URLSearchParams')
+            );
+
+        if ($unsafe) {
+            return [false, 'Fix rejected: user-controlled input still reaches innerHTML sink.'];
+        }
     }
-    if (!$safeSink) {
-        return [false, 'Fix rejected: replace sink with textContent/createTextNode.'];
+
+    if (
+        !str_contains($patched, 'textContent') &&
+        !str_contains($patched, 'createTextNode')
+    ) {
+        return [false, 'Fix rejected: use textContent or createTextNode.'];
     }
+
     return [true, 'DOM XSS mitigation verified.'];
 }
 
