@@ -18,7 +18,7 @@ import { WHITEBOX_WORKBENCH_LAB_IDS } from "../../constants/labs";
 import { fetchHackMeMachineIdentity } from "../../utils/hackmeIdentity";
 
 // Use relative path when proxy exists (dev), else full URL (production)
-const API_BASE = import.meta.env.DEV ? "/api" : "http://localhost/HackMe/server/controllers";
+const API_BASE = import.meta.env.DEV ? "/api" : "/HackMe/server/controllers";
 
 /** Stable per-browser secret (real MAC is not exposed to web apps). Bound with token + IP on server. */
 function getOrCreateHackMeDeviceBind() {
@@ -153,7 +153,7 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
   ];
   useEffect(() => {
     const handler = (e) => {
-      if (!labOrigins.includes(e?.origin ?? "")) return;
+      //if (!labOrigins.includes(e?.origin ?? "")) return;
       const d = e?.data;
       if (!d || d?.type !== "HACKME_LAB_SOLVED") return;
       const msgLabId = d.labId ?? d.lab_id;
@@ -349,7 +349,7 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
       const normalizedPath = launchPath.startsWith("/") ? launchPath : `/${launchPath}`;
       const separator = normalizedPath.includes("?") ? "&" : "?";
       const url =
-        `http://localhost:${port}${normalizedPath}${separator}labId=${lab.lab_id}&token=${encodeURIComponent(data.token)}` +
+        `http://localhost:${window.location.hostname}:${port}${normalizedPath}${separator}labId=${lab.lab_id}&token=${encodeURIComponent(data.token)}` +
         `&device_bind=${encodeURIComponent(deviceBind)}` +
         `&mac_address=${encodeURIComponent(mac)}&client_local_ip=${encodeURIComponent(localIp)}`;
       // Open in a fresh tab each time to avoid stale-window reuse redirects.

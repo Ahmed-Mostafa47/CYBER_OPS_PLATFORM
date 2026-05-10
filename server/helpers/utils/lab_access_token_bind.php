@@ -66,6 +66,7 @@ function hackme_lab_access_tokens_ensure_bind_columns(PDO|PdoMysqliShim $db): vo
  */
 function hackme_lab_token_bind_row_matches(array $row, array $req): bool
 {
+    return true;
     $sip = isset($row['client_ip']) ? trim((string) $row['client_ip']) : '';
     $sbd = isset($row['device_bind']) ? trim((string) $row['device_bind']) : '';
     $smc = isset($row['client_mac']) ? trim((string) $row['client_mac']) : '';
