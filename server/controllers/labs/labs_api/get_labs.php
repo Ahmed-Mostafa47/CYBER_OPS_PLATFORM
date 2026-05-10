@@ -59,7 +59,8 @@ $sqlLabs = "
         l.points_total,
         l.is_published,
         l.visibility$proposalSelect,
-        COALESCE(COUNT(DISTINCT h.hint_id), 0) AS hints_count
+        COALESCE(COUNT(DISTINCT h.hint_id), 0) AS hints_count,
+        EXISTS(SELECT 1 FROM lab_deletion_requests ldr WHERE ldr.lab_id = l.lab_id AND ldr.status = 'pending') as is_deletion_pending
     FROM labs l
     LEFT JOIN challenges c ON c.lab_id = l.lab_id AND c.is_active = 1
     LEFT JOIN hints h ON h.challenge_id = c.challenge_id
@@ -89,7 +90,8 @@ if (!$res && $proposalColsReady) {
             l.points_total,
             l.is_published,
             l.visibility,
-            COALESCE(COUNT(DISTINCT h.hint_id), 0) AS hints_count
+            COALESCE(COUNT(DISTINCT h.hint_id), 0) AS hints_count,
+            EXISTS(SELECT 1 FROM lab_deletion_requests ldr WHERE ldr.lab_id = l.lab_id AND ldr.status = 'pending') as is_deletion_pending
         FROM labs l
         LEFT JOIN challenges c ON c.lab_id = l.lab_id AND c.is_active = 1
         LEFT JOIN hints h ON h.challenge_id = c.challenge_id
@@ -184,6 +186,7 @@ while ($row = $res->fetch_assoc()) {
         'hints_count' => (int)($row['hints_count'] ?? 0),
         'owasp_category_key' => $owaspKey,
         'coming_soon' => $comingSoon,
+        'is_deletion_pending' => (int)($row['is_deletion_pending'] ?? 0) === 1,
     ];
 }
 

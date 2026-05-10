@@ -333,11 +333,17 @@ const InstructorLabsDashboard = ({ isAdmin = false }) => {
     );
     if (!ok) return;
     try {
-      await labService.deleteLab({
+      const res = await labService.deleteLab({
         userId: currentUserId,
         labId: Number(lab?.lab_id) || 0,
       });
-      setLabs((prev) => prev.filter((l) => Number(l.lab_id) !== Number(lab.lab_id)));
+      
+      if (res?.message === "Deletion request sent to administrators") {
+        window.alert("Your request to delete this lab has been sent to the administrators for review.");
+      } else {
+        setLabs((prev) => prev.filter((l) => Number(l.lab_id) !== Number(lab.lab_id)));
+        window.alert("Lab deleted successfully.");
+      }
     } catch (err) {
       window.alert(err?.message || "Failed to delete lab.");
     }
@@ -799,11 +805,16 @@ const InstructorLabsDashboard = ({ isAdmin = false }) => {
                     </button>
                     <button
                       type="button"
+                      disabled={lab.is_deletion_pending && !isAdmin}
                       onClick={() => handleRemoveLab(lab)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/60 bg-rose-500/10 px-3 py-1.5 text-[11px] font-mono text-rose-200 hover:bg-rose-500/20 transition-colors"
+                      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-mono transition-colors ${
+                        lab.is_deletion_pending && !isAdmin
+                          ? "border-amber-500/40 bg-amber-500/10 text-amber-300 opacity-70 cursor-not-allowed"
+                          : "border-rose-500/60 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
+                      }`}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                      Remove
+                      {lab.is_deletion_pending && !isAdmin ? "Deletion Pending" : "Remove"}
                     </button>
                   </div>
                 </div>

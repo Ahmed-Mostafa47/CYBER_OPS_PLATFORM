@@ -776,11 +776,18 @@ function AppContent() {
           );
           if (!ok) return false;
           try {
-            await labService.deleteLab({
+            const res = await labService.deleteLab({
               userId,
               labId: Number(lab?.lab_id || 0),
             });
-            return true;
+
+            if (res?.message === "Deletion request sent to administrators") {
+              window.alert("Your request to delete this lab has been sent to the administrators for review.");
+              return false; // Don't remove from UI
+            }
+
+            window.alert("Lab deleted successfully.");
+            return true; // Remove from UI
           } catch (err) {
             window.alert(err?.message || "Failed to delete lab.");
             return false;
