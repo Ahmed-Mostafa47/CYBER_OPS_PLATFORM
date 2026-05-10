@@ -93,7 +93,7 @@ const SetPasswordPage = ({ email, onPasswordSet, onBackToVerification }) => {
 
   try {
     const response = await axios.post(
-      "http://localhost/HackMe/server/auth/set_password.php",
+      "http://localhost/HackMe/server/controllers/auth/set_password.php",
       requestData,
       {
         headers: {

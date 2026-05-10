@@ -1,6 +1,6 @@
 import apiClient from "./apiClient";
 
-const COMMENTS_ENDPOINT = "/comments.php";
+const COMMENTS_ENDPOINT = "/social/comments.php";
 
 export const fetchComments = async (userId) => {
   const params = userId ? { user_id: userId } : undefined;

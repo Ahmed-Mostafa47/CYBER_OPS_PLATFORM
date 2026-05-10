@@ -34,9 +34,13 @@ const LabWhiteboxPage = ({ currentUser, onFlagSuccess }) => {
 
   useEffect(() => {
     if (!isWhiteboxWorkbench) {
-      navigate(`/lab-modern?labId=${encodeURIComponent(String(labId))}`, { replace: true });
+      const q = new URLSearchParams();
+      q.set("labId", String(labId));
+      if (fromCategory) q.set("fromCategory", fromCategory);
+      if (labType) q.set("labType", labType);
+      navigate(`/lab-modern?${q.toString()}`, { replace: true });
     }
-  }, [isWhiteboxWorkbench, labId, navigate]);
+  }, [isWhiteboxWorkbench, labId, navigate, fromCategory, labType]);
 
   const [lab, setLab] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -53,14 +57,14 @@ const LabWhiteboxPage = ({ currentUser, onFlagSuccess }) => {
   const [solutionLoading, setSolutionLoading] = useState(false);
   const [solutionError, setSolutionError] = useState("");
 
-  const API_BASE = import.meta.env.DEV ? "/api" : "http://localhost/HackMe/server/api";
+  const API_BASE = import.meta.env.DEV ? "/api" : "http://localhost/HackMe/server/controllers";
 
   const goBack = () => {
     if (fromCategory && labType) {
       navigate(`/labs?labType=${encodeURIComponent(labType)}&category=${encodeURIComponent(fromCategory)}`);
       return;
     }
-    navigate("/labs");
+    navigate("/training");
   };
 
   useEffect(() => {
@@ -99,7 +103,7 @@ const LabWhiteboxPage = ({ currentUser, onFlagSuccess }) => {
     const abort = new AbortController();
     const check = async () => {
       try {
-        const url = `${API_BASE}/labs/check_lab_solved.php?lab_id=${lab.lab_id}&user_id=${uid}&scope=whitebox`;
+        const url = `${API_BASE}/labs/labs_api/check_lab_solved.php?lab_id=${lab.lab_id}&user_id=${uid}&scope=whitebox`;
         const r = await fetch(url, { cache: "no-store", signal: abort.signal });
         const d = await r.json().catch(() => ({}));
         if (abort.signal.aborted) return;
@@ -125,7 +129,7 @@ const LabWhiteboxPage = ({ currentUser, onFlagSuccess }) => {
       setSolutionViewed(false);
       return;
     }
-    const url = `${API_BASE}/labs/resource_usage.php?lab_id=${lab.lab_id}&user_id=${uid}`;
+    const url = `${API_BASE}/labs/labs_api/resource_usage.php?lab_id=${lab.lab_id}&user_id=${uid}`;
     fetch(url, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
@@ -133,14 +137,14 @@ const LabWhiteboxPage = ({ currentUser, onFlagSuccess }) => {
         setHintViewed(Boolean(d?.data?.hint_viewed));
         setSolutionViewed(Boolean(d?.data?.solution_viewed));
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [lab?.lab_id, currentUser?.user_id, currentUser?.id, API_BASE]);
 
   const markResourceViewed = async (resourceType) => {
     const uid = currentUser?.user_id ?? currentUser?.id;
     if (!uid || !lab?.lab_id) return;
     try {
-      await fetch(`${API_BASE}/labs/resource_usage.php`, {
+      await fetch(`${API_BASE}/labs/labs_api/resource_usage.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -150,7 +154,7 @@ const LabWhiteboxPage = ({ currentUser, onFlagSuccess }) => {
           viewed: true,
         }),
       });
-    } catch (_) {}
+    } catch (_) { }
   };
 
   const handleRevealSolution = async () => {
@@ -187,29 +191,44 @@ const LabWhiteboxPage = ({ currentUser, onFlagSuccess }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black flex items-center justify-center">
-        <p className="text-slate-400 font-mono text-sm">Loading white-box lab…</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black px-4 sm:px-6 lg:px-10 pt-24 pb-16 scroll-pt-24">
+        <div className="max-w-6xl mx-auto">
+          <button
+            type="button"
+            onClick={goBack}
+            className="mb-10 inline-flex items-center gap-2 text-xs sm:text-sm font-mono text-slate-400 hover:text-emerald-300 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden />
+            BACK
+          </button>
+          <div className="flex justify-center py-20">
+            <p className="text-slate-400 font-mono text-sm">Loading white-box lab…</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (error || !lab) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black flex flex-col items-center justify-center gap-4 px-6">
-        <p className="text-rose-300 font-mono text-sm">{error || "Lab not found."}</p>
-        <button
-          type="button"
-          onClick={goBack}
-          className="text-xs font-mono text-emerald-400 hover:underline"
-        >
-          Back
-        </button>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black px-4 sm:px-6 lg:px-10 pt-24 pb-16 scroll-pt-24">
+        <div className="max-w-6xl mx-auto flex flex-col items-start gap-6">
+          <button
+            type="button"
+            onClick={goBack}
+            className="inline-flex items-center gap-2 text-xs sm:text-sm font-mono text-slate-400 hover:text-emerald-300 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden />
+            BACK
+          </button>
+          <p className="text-rose-300 font-mono text-sm">{error || "Lab not found."}</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black py-8 px-4 sm:px-6 lg:px-10">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black pt-24 pb-16 scroll-pt-24 px-4 sm:px-6 lg:px-10">
       {successPopupVisible && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4 animate-slide-down">
           <div className="flex items-center gap-3 rounded-xl border border-emerald-500/50 bg-slate-900/95 backdrop-blur-sm px-5 py-4 shadow-2xl shadow-emerald-500/20">
@@ -231,10 +250,10 @@ const LabWhiteboxPage = ({ currentUser, onFlagSuccess }) => {
         <button
           type="button"
           onClick={goBack}
-          className="inline-flex items-center gap-2 text-xs font-mono text-slate-400 hover:text-emerald-300"
+          className="inline-flex items-center gap-2 text-xs sm:text-sm font-mono text-slate-400 hover:text-emerald-300 transition-colors pt-0.5"
         >
-          <ArrowLeft className="w-4 h-4" />
-          BACK
+          <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden />
+          BACK_TO_LABS
         </button>
 
         <header className="rounded-2xl border border-emerald-500/30 bg-slate-900/60 p-6 shadow-lg shadow-emerald-900/20">
@@ -247,7 +266,7 @@ const LabWhiteboxPage = ({ currentUser, onFlagSuccess }) => {
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-50 font-mono break-words">
                 {lab.title}
               </h1>
-              <p className="text-sm text-slate-300 max-w-3xl leading-relaxed">{lab.description}</p>
+
             </div>
             <div className="flex flex-wrap gap-2 shrink-0">
               <span
@@ -291,83 +310,7 @@ const LabWhiteboxPage = ({ currentUser, onFlagSuccess }) => {
             </p>
           </section>
 
-          <aside className="space-y-4">
-            {!hideHints && (
-              <div className="rounded-2xl border border-slate-700 bg-slate-900/80 p-4 shadow-lg shadow-black/40">
-                <button
-                  className="flex w-full items-center justify-between gap-2 text-sm font-mono text-slate-100"
-                  onClick={() => {
-                    setHintsOpen((v) => !v);
-                    if (!hintViewed) {
-                      setHintViewed(true);
-                      markResourceViewed("hint");
-                    }
-                  }}
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-300" />
-                    Hints (-25%)
-                  </span>
-                  {hintsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                </button>
 
-                {hintsOpen && (
-                  <div className="mt-3 space-y-2 text-xs text-slate-200 font-mono">
-                    {derivedHints.map((hint, idx) => (
-                      <div
-                        key={idx}
-                        className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2"
-                      >
-                        <span className="text-amber-300 text-[11px]">HINT_{idx + 1}</span>
-                        <p className="mt-1 text-amber-50 text-[11px]">{hint}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="rounded-2xl border border-slate-700 bg-slate-900/80 p-4 shadow-lg shadow-black/40">
-              <button
-                className="flex w-full items-center justify-between gap-2 text-sm font-mono text-slate-100"
-                onClick={() => setSolutionOpen((v) => !v)}
-              >
-                <span className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-rose-400" />
-                  Solution (-75%)
-                </span>
-                {solutionOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </button>
-
-              {solutionOpen && (
-                <div className="mt-3 space-y-3 text-xs text-slate-200 font-mono">
-                  {!solutionConfirm && (
-                    <div className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-3">
-                      <p className="text-rose-100 text-[11px]">
-                        Are you sure you want to view the solution? This may reduce your awarded score by 75%.
-                      </p>
-                      <button
-                        onClick={handleRevealSolution}
-                        disabled={solutionLoading}
-                        className="mt-2 inline-flex items-center gap-1 rounded-lg border border-rose-400/60 bg-rose-500/20 px-3 py-1.5 text-[11px] text-rose-100 hover:bg-rose-500/30 transition-colors"
-                      >
-                        {solutionLoading ? "Loading..." : "Reveal Solution"}
-                      </button>
-                      {solutionError && <p className="mt-2 text-[11px] text-rose-200">{solutionError}</p>}
-                    </div>
-                  )}
-
-                  {solutionConfirm && (
-                    <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-3">
-                      <p className="text-emerald-50 text-[11px] whitespace-pre-wrap">
-                        {solutionText || "No solution text returned."}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </aside>
         </div>
 
         {!uid ? (

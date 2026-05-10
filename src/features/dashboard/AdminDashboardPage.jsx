@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Shield, Users, Database, Activity, ChevronDown, ChevronUp, UserPlus, UserMinus, Trash2, AlertTriangle, Search } from "lucide-react";
 import axios from "axios";
+import { fetchHackMeMachineIdentity } from "../../utils/hackmeIdentity";
+import { labService } from "../../services/labService";
 
-const API_BASE = "http://localhost/HackMe/server/api";
+const API_BASE = "http://localhost/HackMe/server/controllers";
 
 const AdminDashboardPage = ({
   pendingRoleRequests = [],
@@ -31,6 +33,7 @@ const AdminDashboardPage = ({
   const [deleteConfirmUserId, setDeleteConfirmUserId] = useState(null);
   const [deletingUserId, setDeletingUserId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [labDeletionRequests, setLabDeletionRequests] = useState([]);
 
   useEffect(() => {
     setRequests(pendingRoleRequests);
@@ -72,7 +75,7 @@ const AdminDashboardPage = ({
   const fetchLatestRequests = async () => {
     setIsRefreshing(true);
     try {
-      const { data } = await axios.get(`${API_BASE}/request_role.php`, {
+      const { data } = await axios.get(`${API_BASE}/users/request_role.php`, {
         params: { all: 1 },
       });
       if (data.success) {
@@ -97,9 +100,22 @@ const AdminDashboardPage = ({
     }
   };
 
+  const fetchLabDeletionRequests = async () => {
+    if (!currentUser?.user_id) return;
+    try {
+      const data = await labService.getLabDeletionRequests({ userId: currentUser.user_id });
+      if (data?.success) {
+        setLabDeletionRequests(data?.data?.requests || []);
+      }
+    } catch (error) {
+      console.error("Failed to load lab deletion requests", error);
+    }
+  };
+
   useEffect(() => {
     fetchLatestRequests();
-  }, []);
+    fetchLabDeletionRequests();
+  }, [currentUser?.user_id]);
 
   // Fetch users when section is opened
   useEffect(() => {
@@ -111,7 +127,7 @@ const AdminDashboardPage = ({
   const fetchUsers = async () => {
     setLoadingUsers(true);
     try {
-      const { data } = await axios.get(`${API_BASE}/manage_users.php`, {
+      const { data } = await axios.get(`${API_BASE}/users/manage_users.php`, {
         params: {
           current_user_id: currentUser?.user_id,
         },
@@ -130,13 +146,29 @@ const AdminDashboardPage = ({
     }
   };
 
+  const buildAuditContext = async () => {
+    let localIp = "";
+    try {
+      const identity = await fetchHackMeMachineIdentity();
+      localIp = identity?.local_ipv4 || "";
+    } catch (_) {}
+    return {
+      client_local_ip: localIp,
+      client_time_utc: new Date().toISOString(),
+      client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
+      client_tz_offset_minutes: new Date().getTimezoneOffset(),
+    };
+  };
+
   const handleAssignRole = async (targetUserId, roleName) => {
     setProcessingUserId(targetUserId);
     try {
-      const { data } = await axios.post(`${API_BASE}/manage_users.php`, {
+      const auditCtx = await buildAuditContext();
+      const { data } = await axios.post(`${API_BASE}/users/manage_users.php`, {
         current_user_id: currentUser?.user_id,
         target_user_id: targetUserId,
         role_name: roleName,
+        ...auditCtx,
       });
       if (data.success) {
         triggerStatusMessage(
@@ -158,10 +190,12 @@ const AdminDashboardPage = ({
   const handleRemoveRole = async (targetUserId, roleName) => {
     setProcessingUserId(targetUserId);
     try {
-      const { data } = await axios.put(`${API_BASE}/manage_users.php`, {
+      const auditCtx = await buildAuditContext();
+      const { data } = await axios.put(`${API_BASE}/users/manage_users.php`, {
         current_user_id: currentUser?.user_id,
         target_user_id: targetUserId,
         role_name: roleName,
+        ...auditCtx,
       });
       if (data.success) {
         triggerStatusMessage(`ROLE ${roleName.toUpperCase()} REMOVED`, "success");
@@ -180,10 +214,12 @@ const AdminDashboardPage = ({
   const handleDeleteUser = async (targetUserId) => {
     setDeletingUserId(targetUserId);
     try {
-      const { data } = await axios.delete(`${API_BASE}/manage_users.php`, {
+      const auditCtx = await buildAuditContext();
+      const { data } = await axios.delete(`${API_BASE}/users/manage_users.php`, {
         data: {
           current_user_id: currentUser?.user_id,
           target_user_id: targetUserId,
+          ...auditCtx,
         },
       });
       if (data.success) {
@@ -207,9 +243,12 @@ const AdminDashboardPage = ({
   const handleApprove = async (requestId, userId) => {
     setProcessingId(requestId);
     try {
-      const { data } = await axios.put(`${API_BASE}/request_role.php`, {
+      const auditCtx = await buildAuditContext();
+      const { data } = await axios.put(`${API_BASE}/users/request_role.php`, {
         request_id: requestId,
         status: "approved",
+        current_user_id: currentUser?.user_id,
+        ...auditCtx,
       });
       if (data.success) {
         setRequests((prev) =>
@@ -231,9 +270,12 @@ const AdminDashboardPage = ({
   const handleReject = async (requestId) => {
     setProcessingId(requestId);
     try {
-      const { data } = await axios.put(`${API_BASE}/request_role.php`, {
+      const auditCtx = await buildAuditContext();
+      const { data } = await axios.put(`${API_BASE}/users/request_role.php`, {
         request_id: requestId,
         status: "rejected",
+        current_user_id: currentUser?.user_id,
+        ...auditCtx,
       });
       if (data.success) {
         setRequests((prev) =>
@@ -247,6 +289,23 @@ const AdminDashboardPage = ({
         error.response?.data?.message || "REJECTION_FAILED",
         "error"
       );
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleManageLabDeletion = async (requestId, action) => {
+    setProcessingId(`lab_del_${requestId}`);
+    try {
+      await labService.manageLabDeletion({
+        userId: currentUser?.user_id,
+        requestId,
+        action,
+      });
+      triggerStatusMessage(`LAB DELETION REQUEST ${action.toUpperCase()}D`, "success");
+      fetchLabDeletionRequests();
+    } catch (error) {
+      triggerStatusMessage(error.message || `FAILED TO ${action.toUpperCase()} DELETION`, "error");
     } finally {
       setProcessingId(null);
     }
@@ -274,6 +333,13 @@ const AdminDashboardPage = ({
       value: statsData?.pending_role_requests ?? pendingRequests,
       icon: Shield,
       gradient: "from-purple-600 to-purple-700",
+    },
+    {
+      label: "LAB_DELETION_REQUESTS",
+      value: labDeletionRequests.length,
+      icon: Trash2,
+      gradient: "from-red-600 to-red-700",
+      highlight: labDeletionRequests.length > 0
     },
   ];
 
@@ -324,7 +390,18 @@ const AdminDashboardPage = ({
             return (
               <div
                 key={stat.label}
-                className="bg-gray-900/70 border border-gray-700 rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 shadow-xl"
+                onClick={() => {
+                  if (stat.label === "LAB_DELETION_REQUESTS") {
+                    document.getElementById("lab-deletion-requests")?.scrollIntoView({ behavior: "smooth" });
+                  } else if (stat.label === "PENDING_ROLE_REQUESTS") {
+                    document.getElementById("role-requests")?.scrollIntoView({ behavior: "smooth" });
+                  }
+                }}
+                className={`bg-gray-900/70 border rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 shadow-xl transition-all cursor-pointer hover:bg-gray-800/80 ${
+                  stat.highlight 
+                    ? "border-red-500/50 shadow-red-500/10 animate-pulse" 
+                    : "border-gray-700 shadow-xl"
+                }`}
               >
                 <div
                   className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center mb-3 sm:mb-4 border border-white/20`}
@@ -332,9 +409,14 @@ const AdminDashboardPage = ({
                   <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
                 <p className="text-xs sm:text-sm text-gray-500 font-mono">{stat.label}</p>
-                <p className="text-2xl sm:text-3xl font-bold text-white font-mono">
-                  {stat.value}
-                </p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-2xl sm:text-3xl font-bold text-white font-mono">
+                    {stat.value}
+                  </p>
+                  {stat.highlight && (
+                    <span className="text-[10px] text-red-400 font-bold animate-bounce">NEW</span>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -567,7 +649,7 @@ const AdminDashboardPage = ({
           )}
         </div>
 
-        <div className="bg-gray-900/70 border border-gray-800 rounded-2xl p-6 shadow-2xl">
+        <div className="bg-gray-900/70 border border-gray-800 rounded-2xl p-6 shadow-2xl" id="role-requests">
           <div className="flex items-center gap-3 mb-6">
             <Activity className="w-5 h-5 text-green-400" />
             <h2 className="text-2xl font-bold text-white font-mono">
@@ -703,6 +785,97 @@ const AdminDashboardPage = ({
                   </div>
                   );
                 })}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-gray-900/70 border border-gray-800 rounded-2xl p-6 shadow-2xl mt-6" id="lab-deletion-requests">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <Trash2 className={`w-5 h-5 ${labDeletionRequests.length > 0 ? "text-red-400 animate-pulse" : "text-gray-400"}`} />
+              <h2 className="text-2xl font-bold text-white font-mono">
+                LAB_DELETION_REQUESTS
+              </h2>
+            </div>
+            {labDeletionRequests.length > 0 && (
+              <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-bounce">
+                {labDeletionRequests.length} NEW
+              </span>
+            )}
+          </div>
+
+          {labDeletionRequests.length === 0 ? (
+            <div className="text-center py-10 text-gray-500 font-mono">
+              NO_ACTIVE_LAB_DELETION_REQUESTS
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {labDeletionRequests.map((request) => (
+                <div
+                  key={request.id}
+                  className="bg-gray-800/60 border border-gray-700 rounded-xl p-6 hover:border-red-500/50 transition-all"
+                >
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start border-b border-gray-700 pb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-600 to-rose-600 flex items-center justify-center text-white font-bold font-mono border border-red-500/30">
+                            {request.instructor_username?.charAt(0)?.toUpperCase() || "I"}
+                          </div>
+                          <div>
+                            <p className="text-white font-mono font-semibold text-lg">
+                              {request.instructor_full_name || request.instructor_username}
+                            </p>
+                            <p className="text-gray-400 text-xs font-mono">
+                              @{request.instructor_username}
+                            </p>
+                            <p className="text-rose-400 text-xs font-mono mt-1">
+                              INSTRUCTOR
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-left sm:text-right">
+                        <p className="text-xs text-gray-500 font-mono mb-1">REQUEST_ID</p>
+                        <p className="text-sm text-gray-400 font-mono">#{request.id}</p>
+                        <p className="text-xs text-gray-500 font-mono mt-2">
+                          {new Date(request.created_at).toLocaleDateString("en-US", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                      <p className="text-xs text-red-400 font-mono mb-1">TARGET_LAB_TO_DELETE</p>
+                      <p className="text-lg font-bold text-red-300 font-mono">
+                        {request.lab_title} (ID: {request.lab_id})
+                      </p>
+                    </div>
+
+                    <div className="flex gap-3 justify-end pt-2 border-t border-gray-700">
+                      <button
+                        onClick={() => handleManageLabDeletion(request.id, 'reject')}
+                        disabled={processingId === `lab_del_${request.id}`}
+                        className="px-6 py-2.5 rounded-lg bg-gray-500/20 text-gray-400 border border-gray-500/50 font-mono text-sm hover:bg-gray-500/30 hover:border-gray-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                      >
+                        {processingId === `lab_del_${request.id}` ? "PROCESSING..." : "REJECT"}
+                      </button>
+                      <button
+                        onClick={() => handleManageLabDeletion(request.id, 'approve')}
+                        disabled={processingId === `lab_del_${request.id}`}
+                        className="px-6 py-2.5 rounded-lg bg-red-500/20 text-red-400 border border-red-500/50 font-mono text-sm hover:bg-red-500/30 hover:border-red-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                      >
+                        {processingId === `lab_del_${request.id}` ? "PROCESSING..." : "APPROVE_AND_DELETE"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

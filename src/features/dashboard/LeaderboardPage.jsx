@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Trophy, Target, Award, Bug, Clock } from "lucide-react";
 
-const API_BASE = import.meta.env.DEV ? "/api" : "http://localhost/HackMe/server/api";
+const API_BASE = import.meta.env.DEV ? "/api" : "http://localhost/HackMe/server/controllers";
 
 function formatMissionTime(iso) {
   if (!iso) return "—";
@@ -32,7 +32,7 @@ const LeaderboardPage = ({ currentUser }) => {
   const fetchLeaderboard = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/get_leaderboard.php?limit=20`);
+      const res = await fetch(`${API_BASE}/users/get_leaderboard.php?limit=20`);
       const data = await res.json();
       if (data.success) {
         const list = (data.leaderboard || []).map((p, i) => ({
@@ -69,7 +69,7 @@ const LeaderboardPage = ({ currentUser }) => {
     setStatsLoading(true);
     try {
       const res = await fetch(
-        `${API_BASE}/get_user_dashboard_stats.php?user_id=${encodeURIComponent(uid)}`,
+        `${API_BASE}/users/get_user_dashboard_stats.php?user_id=${encodeURIComponent(uid)}`,
         { cache: "no-store" }
       );
       const data = await res.json();

@@ -1,0 +1,11 @@
+{
+    "token": "a72c09e0ab15848f00d8b329d13ca932",
+    "created_at": 1777850004,
+    "metadata": {
+        "title": "HackMe Upload Test Lab",
+        "difficulty": "easy",
+        "category": "General",
+        "type": "whitebox"
+    },
+    "warnings": []
+}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { ShieldCheck, KeyRound, Award, Users, Trash2, Eye, EyeOff, AlertTriangle } from "lucide-react";
 
-const API_BASE = import.meta.env.DEV ? "/api" : "http://localhost/HackMe/server/api";
+const API_BASE = import.meta.env.DEV ? "/api" : "http://localhost/HackMe/server/controllers";
 
 const ProfilePage = ({
   currentUser,
@@ -35,7 +35,7 @@ const ProfilePage = ({
     let cancelled = false;
     const fetchPoints = async () => {
       try {
-        const res = await fetch(`${API_BASE}/get_user_points.php?user_id=${currentUser.user_id}`);
+        const res = await fetch(`${API_BASE}/users/get_user_points.php?user_id=${currentUser.user_id}`);
         const data = await res.json();
         if (!cancelled && data.success && data.total_points != null) {
           setPoints(data.total_points);
@@ -50,7 +50,8 @@ const ProfilePage = ({
   const displayPoints = currentUser?.total_points ?? points;
 
   const getStatusBadge = (status) => {
-    if (!status) return null;
+    // If status is empty, or if it's already approved (they have their rank badge anyway)
+    if (!status || status === 'approved') return null;
     const colors = {
       pending: "text-yellow-400 bg-yellow-400/10 border-yellow-400/30",
       approved: "text-green-400 bg-green-400/10 border-green-400/30",

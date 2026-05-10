@@ -3,6 +3,7 @@ import {
   Plus,
   Upload,
   FileArchive,
+  FolderTree,
   AlertTriangle,
   CheckCircle2,
   XCircle,
@@ -13,6 +14,20 @@ import {
   X,
 } from "lucide-react";
 import { labService } from "../../services/labService";
+import { LAB_TYPES } from "../../data/labTypes";
+import { OWASP_TOP_10 } from "../../utils/labCategories";
+import { getStoredUserId } from "../../utils/storedUser";
+
+const buildInitialForm = () => ({
+  title: "",
+  description: "",
+  lab_mode: LAB_TYPES.WHITE_BOX,
+  difficulty: "easy",
+  category: OWASP_TOP_10[0].key,
+  points_total: 100,
+  hints: "",
+  solution: "",
+});
 
 const statusColors = {
   pending:
@@ -23,23 +38,40 @@ const statusColors = {
     "bg-rose-500/10 text-rose-300 border-rose-400/50 shadow-rose-500/20",
 };
 
-const InstructorLabsDashboard = () => {
+const InstructorLabsDashboard = ({ isAdmin = false }) => {
   const [labs, setLabs] = useState([]);
   const [labsError, setLabsError] = useState("");
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    difficulty: "easy",
-    category: "",
-    hints: "",
-    solution: "",
-  });
+  const [form, setForm] = useState(buildInitialForm);
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [submitSuccess, setSubmitSuccess] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [zipFile, setZipFile] = useState(null);
   const [uploadingZip, setUploadingZip] = useState(false);
   const [finalizingZip, setFinalizingZip] = useState(false);
   const [zipResult, setZipResult] = useState(null);
   const [zipError, setZipError] = useState("");
+  const [proposalZipAttached, setProposalZipAttached] = useState(false);
+  const [submitResultKind, setSubmitResultKind] = useState(null);
+  const [directPublishLabId, setDirectPublishLabId] = useState(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [editForm, setEditForm] = useState({
+    lab_id: 0,
+    title: "",
+    description: "",
+    labtype_id: 1,
+    difficulty: "easy",
+    points_total: 0,
+    visibility: "public",
+    is_published: true,
+    icon: "",
+    launch_path: "",
+    port: "",
+    hints: "",
+    solution: "",
+  });
   const getLabTypeLabel = (labtypeId) => {
     if (labtypeId === 1) return "WHITE_BOX";
     if (labtypeId === 2) return "BLACK_BOX";
@@ -66,21 +98,75 @@ const InstructorLabsDashboard = () => {
     };
   }, []);
 
-  const handleSubmitLab = (e) => {
-    e.preventDefault();
-    // UI only
-    console.log("Instructor submitted lab:", form);
-  };
+  const currentUserId = getStoredUserId();
 
-  const currentUser = (() => {
-    try {
-      const parsed = JSON.parse(localStorage.getItem("currentUser") || "{}");
-      return parsed && typeof parsed === "object" ? parsed : {};
-    } catch {
-      return {};
+  const handleSubmitLab = async (e) => {
+    e.preventDefault();
+    setSubmitError("");
+    setSubmitSuccess(false);
+    setSubmitResultKind(null);
+    setDirectPublishLabId(null);
+    if (!currentUserId) {
+      setSubmitError("Missing logged-in user id.");
+      return false;
     }
-  })();
-  const currentUserId = Number(currentUser?.user_id || currentUser?.id || 0);
+    if (!form.title.trim() || !form.description.trim()) {
+      setSubmitError("Title and description are required.");
+      return false;
+    }
+    if (!zipResult?.upload_token) {
+      setSubmitError(
+        "Validate your lab archive first: pick a .zip or .rar above, then click Validate (green area). Submit stays locked until validation succeeds."
+      );
+      return false;
+    }
+    setSubmitLoading(true);
+    setProposalZipAttached(false);
+    try {
+      const labtype_id = form.lab_mode === LAB_TYPES.BLACK_BOX ? 2 : 1;
+      const res = await labService.submitLabProposal({
+        userId: currentUserId,
+        title: form.title.trim(),
+        description: form.description.trim(),
+        labtypeId: labtype_id,
+        difficulty: form.difficulty,
+        pointsTotal: Number(form.points_total) || 0,
+        owaspCategory: form.category,
+        hints: form.hints,
+        solution: form.solution,
+        uploadToken: zipResult?.upload_token || "",
+        zipOriginalName: zipFile?.name || "",
+      });
+      const direct = !!res?.data?.direct_publish;
+      setProposalZipAttached(!!res?.data?.zip_packaged && !direct);
+      setSubmitResultKind(direct ? "direct" : "request");
+      setDirectPublishLabId(direct && res?.data?.lab_id ? Number(res.data.lab_id) : null);
+      setSubmitSuccess(true);
+      setForm(buildInitialForm());
+      setZipResult(null);
+      setZipFile(null);
+      
+      const successMsg = direct 
+        ? "The lab has been uploaded successfully." 
+        : "The lab has been sent to the admin for approval.";
+      window.alert(successMsg);
+
+      if (direct) {
+        try {
+          const fresh = await labService.getLabs();
+          setLabs(fresh?.data?.labs || []);
+        } catch {
+          /* ignore */
+        }
+      }
+      return true;
+    } catch (err) {
+      setSubmitError(err?.message || "Submit failed.");
+      return false;
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
 
   const onZipPicked = (file) => {
     setZipError("");
@@ -89,9 +175,10 @@ const InstructorLabsDashboard = () => {
       setZipFile(null);
       return;
     }
-    if (!file.name.toLowerCase().endsWith(".zip")) {
+    const lower = file.name.toLowerCase();
+    if (!lower.endsWith(".zip") && !lower.endsWith(".rar")) {
       setZipFile(null);
-      setZipError("Only .zip files are accepted.");
+      setZipError("Only .zip or .rar files are accepted.");
       return;
     }
     if (file.size > 20 * 1024 * 1024) {
@@ -118,7 +205,7 @@ const InstructorLabsDashboard = () => {
       const res = await labService.uploadLabZip({ file: zipFile, userId: currentUserId });
       setZipResult(res?.data || null);
     } catch (err) {
-      setZipError(err?.message || "ZIP validation failed.");
+      setZipError(err?.message || "Archive validation failed.");
     } finally {
       setUploadingZip(false);
     }
@@ -141,7 +228,12 @@ const InstructorLabsDashboard = () => {
         uploadToken: zipResult.upload_token,
       });
       const labId = done?.data?.lab_id;
-      setZipResult((prev) => ({ ...(prev || {}), finalized_lab_id: labId }));
+      setZipResult((prev) => {
+        const next = { ...(prev || {}) };
+        delete next.upload_token;
+        next.finalized_lab_id = labId;
+        return next;
+      });
       setZipFile(null);
       // refresh list
       const fresh = await labService.getLabs();
@@ -150,6 +242,110 @@ const InstructorLabsDashboard = () => {
       setZipError(err?.message || "Failed to save lab package.");
     } finally {
       setFinalizingZip(false);
+    }
+  };
+
+  const handleOpenEdit = async (lab) => {
+    setEditError("");
+    setEditForm({
+      lab_id: Number(lab.lab_id) || 0,
+      title: String(lab.title || ""),
+      description: String(lab.description || ""),
+      labtype_id: Number(lab.labtype_id) || 1,
+      difficulty: String(lab.difficulty || "easy"),
+      points_total: Number(lab.points_total || 0),
+      visibility: String(lab.visibility || "public"),
+      is_published: !!lab.is_published,
+      icon: String(lab.icon || ""),
+      launch_path: String(lab.launch_path || ""),
+      port: lab.port != null ? String(lab.port) : "",
+      hints: "",
+      solution: "",
+    });
+    setEditOpen(true);
+    if (!currentUserId) return;
+    setEditSaving(true);
+    try {
+      const res = await labService.getLabEditData({ userId: currentUserId, labId: lab.lab_id });
+      const detailedLab = res?.data?.lab;
+      if (detailedLab) {
+        setEditForm((prev) => ({
+          ...prev,
+          solution: detailedLab.solution || "",
+          hints: (detailedLab.hints || []).join("\n"),
+        }));
+      }
+    } catch (err) {
+      setEditError(err?.message || "Failed to load hints/solution.");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!currentUserId) {
+      setEditError("Missing logged-in user id.");
+      return;
+    }
+    setEditSaving(true);
+    setEditError("");
+    try {
+      const res = await labService.updateLabMetadata({
+        userId: currentUserId,
+        labId: editForm.lab_id,
+        title: editForm.title,
+        description: editForm.description,
+        difficulty: editForm.difficulty,
+        pointsTotal: Number(editForm.points_total || 0),
+        visibility: editForm.visibility,
+        isPublished: !!editForm.is_published,
+        icon: editForm.icon,
+        launchPath: editForm.launch_path,
+        port: editForm.port === "" ? null : Number(editForm.port),
+        labtypeId: editForm.labtype_id,
+        solution: editForm.solution,
+        hints: editForm.hints.split("\n").map((h) => h.trim()).filter(Boolean),
+      });
+      const updated = res?.data?.lab;
+      if (updated?.lab_id) {
+        setLabs((prev) =>
+          prev.map((l) =>
+            Number(l.lab_id) === Number(updated.lab_id) ? { ...l, ...updated } : l
+          )
+        );
+      }
+      setEditOpen(false);
+    } catch (err) {
+      setEditError(err?.message || "Failed to update lab metadata.");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleRemoveLab = async (lab) => {
+    if (!currentUserId) {
+      window.alert("Missing logged-in user id.");
+      return;
+    }
+    const ok = window.confirm(
+      `Delete "${lab?.title || "this lab"}"? This action cannot be undone.`
+    );
+    if (!ok) return;
+    try {
+      const res = await labService.deleteLab({
+        userId: currentUserId,
+        labId: Number(lab?.lab_id) || 0,
+      });
+      
+      if (res?.message === "Deletion request sent to administrators") {
+        window.alert("Your request to delete this lab has been sent to the administrators for review.");
+      } else {
+        setLabs((prev) => prev.filter((l) => Number(l.lab_id) !== Number(lab.lab_id)));
+        window.alert("Lab deleted successfully.");
+      }
+    } catch (err) {
+      window.alert(err?.message || "Failed to delete lab.");
     }
   };
 
@@ -173,7 +369,13 @@ const InstructorLabsDashboard = () => {
           <div className="w-full md:w-auto flex justify-start md:justify-end">
             <button
               type="button"
-              onClick={() => setIsModalOpen(true)}
+              onClick={() => {
+                setSubmitError("");
+                setSubmitSuccess(false);
+                setSubmitResultKind(null);
+                setDirectPublishLabId(null);
+                setIsModalOpen(true);
+              }}
               className="w-full md:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2.5 text-xs sm:text-sm font-mono font-semibold text-slate-950 shadow-lg shadow-emerald-500/40 hover:from-emerald-400 hover:to-emerald-500 transition-all"
             >
               <Plus className="w-4 h-4" />
@@ -199,10 +401,90 @@ const InstructorLabsDashboard = () => {
             </div>
 
             <div className="rounded-xl border border-slate-700/80 bg-slate-900/70 p-4 mb-5 space-y-4">
-              <div className="flex items-center gap-2 text-xs font-mono text-slate-300">
-                <FileArchive className="w-4 h-4 text-emerald-300" />
-                ZIP Package Required Structure:
-                <span className="text-slate-500">lab-files/ only (metadata/PDFs optional)</span>
+              <div className="rounded-lg border border-cyan-800/50 bg-slate-950/80 p-4 shadow-inner shadow-black/20">
+                <div className="flex items-start gap-2 mb-2">
+                  <FolderTree className="w-4 h-4 text-cyan-300 shrink-0 mt-0.5" aria-hidden />
+                  <div>
+                    <h3 className="text-xs font-mono font-semibold text-cyan-200 tracking-wide">
+                      Expected archive layout (.zip or .rar — check before uploading)
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-mono mt-1 leading-relaxed">
+                      Put real lab files under <span className="text-slate-300">lab-files/</span> (name is not
+                      case-sensitive). Optional <span className="text-slate-300">metadata.json</span> at the same level
+                      as <span className="text-slate-300">lab-files/</span> in each layout.{" "}
+                      <span className="text-slate-600">
+                        RAR needs the PHP <span className="text-slate-400">rar</span> extension on the server.
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 mt-3">
+                  <div className="rounded-md border border-slate-700/80 bg-slate-900/90 p-3">
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-2">
+                      Option A — lab-files at ZIP root
+                    </p>
+                    <pre
+                      className="text-[11px] font-mono leading-relaxed text-emerald-200/95 whitespace-pre-wrap break-all"
+                      dir="ltr"
+                    >
+{`your-lab.zip   (or .rar)
+├── lab-files/
+│   ├── index.html
+│   ├── app.js
+│   └── …
+└── metadata.json   ← optional`}
+                    </pre>
+                  </div>
+                  <div className="rounded-md border border-slate-700/80 bg-slate-900/90 p-3">
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-2">
+                      Option B — one parent folder
+                    </p>
+                    <pre
+                      className="text-[11px] font-mono leading-relaxed text-emerald-200/95 whitespace-pre-wrap break-all"
+                      dir="ltr"
+                    >
+{`your-lab.zip   (or .rar)
+└── MyLab/
+    ├── lab-files/
+    │   ├── index.html
+    │   └── …
+    └── metadata.json   ← optional`}
+                    </pre>
+                  </div>
+                </div>
+                <details className="mt-3 rounded-md border border-slate-700/60 bg-slate-900/50 px-3 py-2">
+                  <summary className="text-[11px] font-mono text-slate-400 cursor-pointer select-none marker:text-slate-500">
+                    metadata.json fields (if you include it)
+                  </summary>
+                  <pre
+                    className="mt-2 text-[10px] font-mono text-slate-400 leading-relaxed overflow-x-auto border-t border-slate-800 pt-2"
+                    dir="ltr"
+                  >
+{`{
+  "title": "My lab title",
+  "difficulty": "easy",
+  "category": "Injection",
+  "type": "whitebox"
+}`}
+                  </pre>
+                </details>
+              </div>
+
+              <p className="text-[11px] text-slate-500 font-mono leading-relaxed">
+                Validate a ZIP here first; when you submit an <span className="text-slate-300">Add Lab</span>{" "}
+                {isAdmin ? (
+                  <>as admin the lab card is published immediately (ZIP preview is not sent to an approval queue — use Save Lab Package for files).</>
+                ) : (
+                  <>
+                    proposal (form below or modal), the same validated package is attached for admins to download.
+                  </>
+                )}
+              </p>
+              <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+                <FileArchive className="w-4 h-4 text-emerald-300 shrink-0" />
+                <span>
+                  Max 20 MB · .zip or .rar · allowed extensions inside lab-files include php, js, html, css, json, …
+                </span>
               </div>
               <label
                 className="block rounded-xl border-2 border-dashed border-slate-600 hover:border-emerald-400/70 transition-colors p-5 cursor-pointer bg-slate-900/40"
@@ -215,7 +497,7 @@ const InstructorLabsDashboard = () => {
               >
                 <input
                   type="file"
-                  accept=".zip,application/zip,application/x-zip-compressed"
+                  accept=".zip,.rar,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/vnd.rar"
                   className="hidden"
                   onChange={(e) => onZipPicked(e.target.files?.[0] || null)}
                 />
@@ -223,7 +505,7 @@ const InstructorLabsDashboard = () => {
                   <Upload className="w-5 h-5 text-emerald-300" />
                   <div className="text-xs font-mono">
                     <p className="text-slate-200">Drag and drop ZIP here, or click to choose</p>
-                    <p className="text-slate-500 mt-1">Max size: 20MB, extension: .zip only</p>
+                    <p className="text-slate-500 mt-1">Max size: 20MB · .zip or .rar</p>
                     {zipFile && <p className="text-emerald-300 mt-1">Selected: {zipFile.name}</p>}
                   </div>
                 </div>
@@ -278,6 +560,23 @@ const InstructorLabsDashboard = () => {
               className="space-y-4 text-sm text-slate-100"
               onSubmit={handleSubmitLab}
             >
+              {submitError && (
+                <div className="rounded-lg border border-rose-600/60 bg-rose-500/10 px-3 py-2 text-xs font-mono text-rose-200">
+                  {submitError}
+                </div>
+              )}
+              {submitSuccess && (
+                <div className="rounded-lg border border-emerald-600/60 bg-emerald-500/10 px-3 py-2 text-sm font-mono text-emerald-200 space-y-1">
+                  {isAdmin ? (
+                    <p>The lab has been uploaded successfully.</p>
+                  ) : (
+                    <p>The lab has been sent to the admin for approval.</p>
+                  )}
+                  {directPublishLabId ? (
+                    <p className="text-emerald-300/95">New lab ID: {directPublishLabId}</p>
+                  ) : null}
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-mono text-slate-400 mb-1.5">
                   Lab Title
@@ -306,6 +605,26 @@ const InstructorLabsDashboard = () => {
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-mono text-slate-400 mb-1.5">
+                  Lab mode (white box vs black box)
+                </label>
+                <select
+                  className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 transition-all"
+                  value={form.lab_mode}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, lab_mode: e.target.value }))
+                  }
+                >
+                  <option value={LAB_TYPES.WHITE_BOX}>
+                    White box — source / internal view (DB labtype_id: 1)
+                  </option>
+                  <option value={LAB_TYPES.BLACK_BOX}>
+                    Black box — external only, no source (DB labtype_id: 2)
+                  </option>
+                </select>
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1.5">
@@ -326,17 +645,42 @@ const InstructorLabsDashboard = () => {
 
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1.5">
-                    Category
+                    Points reward
                   </label>
                   <input
+                    type="number"
+                    min={0}
+                    max={100000}
                     className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 transition-all"
-                    value={form.category}
+                    value={form.points_total}
                     onChange={(e) =>
-                      setForm((f) => ({ ...f, category: e.target.value }))
+                      setForm((f) => ({
+                        ...f,
+                        points_total: e.target.value === "" ? "" : Number(e.target.value),
+                      }))
                     }
-                    placeholder="e.g. Web, Binary, Cloud, Network"
+                    placeholder="100"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-400 mb-1.5">
+                  OWASP Top 10 category (vulnerability type)
+                </label>
+                <select
+                  className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 transition-all"
+                  value={form.category}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, category: e.target.value }))
+                  }
+                >
+                  {OWASP_TOP_10.map((c) => (
+                    <option key={c.key} value={c.key}>
+                      {c.code}: {c.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -367,13 +711,20 @@ const InstructorLabsDashboard = () => {
                 />
               </div>
 
+              {!zipResult?.upload_token && !submitSuccess ? (
+                <p className="text-[11px] font-mono text-amber-200/90 border border-amber-500/30 rounded-lg bg-amber-500/5 px-3 py-2">
+                  Add Lab submit is locked until you <span className="text-amber-100">Validate</span> an archive
+                  above (you must see &quot;Validation passed&quot; with a live upload session).
+                </p>
+              ) : null}
               <div className="pt-2 flex justify-end">
                 <button
                   type="submit"
-                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2 text-xs sm:text-sm font-mono font-semibold text-slate-950 shadow-lg shadow-emerald-500/40 hover:from-emerald-400 hover:to-emerald-500 transition-all"
+                  disabled={submitLoading || !zipResult?.upload_token}
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2 text-xs sm:text-sm font-mono font-semibold text-slate-950 shadow-lg shadow-emerald-500/40 hover:from-emerald-400 hover:to-emerald-500 transition-all disabled:opacity-50 disabled:pointer-events-none"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  Submit Lab for Approval
+                  {submitLoading ? "Submitting…" : isAdmin ? "Publish Lab Now" : "Submit Lab for Approval"}
                 </button>
               </div>
             </form>
@@ -446,19 +797,24 @@ const InstructorLabsDashboard = () => {
                   <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                     <button
                       type="button"
-                      disabled
+                      onClick={() => handleOpenEdit(lab)}
                       className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-[11px] font-mono text-slate-200 hover:border-emerald-400 hover:text-emerald-300 transition-colors"
                     >
                       <Pencil className="w-3.5 h-3.5" />
-                      Edit (Soon)
+                      Edit
                     </button>
                     <button
                       type="button"
-                      disabled
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/60 bg-rose-500/10 px-3 py-1.5 text-[11px] font-mono text-rose-200 hover:bg-rose-500/20 transition-colors"
+                      disabled={lab.is_deletion_pending && !isAdmin && currentUserId !== 9}
+                      onClick={() => handleRemoveLab(lab)}
+                      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-mono transition-colors ${
+                        lab.is_deletion_pending && !isAdmin && currentUserId !== 9
+                          ? "border-amber-500/40 bg-amber-500/10 text-amber-300 opacity-70 cursor-not-allowed"
+                          : "border-rose-500/60 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
+                      }`}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                      Remove (Soon)
+                      {lab.is_deletion_pending && !isAdmin && currentUserId !== 9 ? "Deletion Pending" : "Remove"}
                     </button>
                   </div>
                 </div>
@@ -480,7 +836,9 @@ const InstructorLabsDashboard = () => {
                       Add New Lab
                     </h2>
                     <p className="text-[11px] text-slate-400 font-mono">
-                      UI only &mdash; no data will be saved.
+                      {isAdmin
+                        ? "Validate an archive on this page first — then submit unlocks. As admin, publish is immediate (no approval queue); use Save Lab Package for file storage."
+                        : "Validate an archive on this page first — then submit unlocks. Request goes to admins with the validated package when you submit."}
                     </p>
                   </div>
                 </div>
@@ -495,11 +853,28 @@ const InstructorLabsDashboard = () => {
 
               <form
                 className="px-5 py-4 space-y-4 text-sm text-slate-100 max-h-[75vh] overflow-y-auto"
-                onSubmit={(e) => {
-                  handleSubmitLab(e);
-                  setIsModalOpen(false);
+                onSubmit={async (e) => {
+                  const ok = await handleSubmitLab(e);
+                  if (ok) setIsModalOpen(false);
                 }}
               >
+                {submitError && (
+                  <div className="rounded-lg border border-rose-600/60 bg-rose-500/10 px-3 py-2 text-xs font-mono text-rose-200">
+                    {submitError}
+                  </div>
+                )}
+                {submitSuccess && (
+                  <div className="rounded-lg border border-emerald-600/60 bg-emerald-500/10 px-3 py-2 text-sm font-mono text-emerald-200 space-y-1">
+                    {isAdmin ? (
+                      <p>The lab has been uploaded successfully.</p>
+                    ) : (
+                      <p>The lab has been sent to the admin for approval.</p>
+                    )}
+                    {directPublishLabId ? (
+                      <p className="text-emerald-300/95">New lab ID: {directPublishLabId}</p>
+                    ) : null}
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1.5">
                     Lab Title
@@ -528,6 +903,26 @@ const InstructorLabsDashboard = () => {
                   />
                 </div>
 
+                <div>
+                  <label className="block text-xs font-mono text-slate-400 mb-1.5">
+                    Lab mode (white box vs black box)
+                  </label>
+                  <select
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 transition-all"
+                    value={form.lab_mode}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, lab_mode: e.target.value }))
+                    }
+                  >
+                    <option value={LAB_TYPES.WHITE_BOX}>
+                      White box — source / internal view (DB labtype_id: 1)
+                    </option>
+                    <option value={LAB_TYPES.BLACK_BOX}>
+                      Black box — external only, no source (DB labtype_id: 2)
+                    </option>
+                  </select>
+                </div>
+
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-mono text-slate-400 mb-1.5">
@@ -551,17 +946,42 @@ const InstructorLabsDashboard = () => {
 
                   <div>
                     <label className="block text-xs font-mono text-slate-400 mb-1.5">
-                      Category
+                      Points reward
                     </label>
                     <input
+                      type="number"
+                      min={0}
+                      max={100000}
                       className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 transition-all"
-                      value={form.category}
+                      value={form.points_total}
                       onChange={(e) =>
-                        setForm((f) => ({ ...f, category: e.target.value }))
+                        setForm((f) => ({
+                          ...f,
+                          points_total: e.target.value === "" ? "" : Number(e.target.value),
+                        }))
                       }
-                      placeholder="e.g. Web, Binary, Cloud, Network"
+                      placeholder="100"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-400 mb-1.5">
+                    OWASP Top 10 category (vulnerability type)
+                  </label>
+                  <select
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 transition-all"
+                    value={form.category}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, category: e.target.value }))
+                    }
+                  >
+                    {OWASP_TOP_10.map((c) => (
+                      <option key={c.key} value={c.key}>
+                        {c.code}: {c.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -592,6 +1012,12 @@ const InstructorLabsDashboard = () => {
                   />
                 </div>
 
+                {!zipResult?.upload_token && !submitSuccess ? (
+                  <p className="text-[11px] font-mono text-amber-200/90 border border-amber-500/30 rounded-lg bg-amber-500/5 px-3 py-2">
+                    Close this dialog and use <span className="text-amber-100">Validate</span> on the main page first —
+                    submit stays locked until validation succeeds.
+                  </p>
+                ) : null}
                 <div className="pt-2 flex flex-col sm:flex-row sm:justify-end gap-2">
                   <button
                     type="button"
@@ -603,10 +1029,177 @@ const InstructorLabsDashboard = () => {
                   </button>
                   <button
                     type="submit"
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2 text-xs sm:text-sm font-mono font-semibold text-slate-950 shadow-lg shadow-emerald-500/40 hover:from-emerald-400 hover:to-emerald-500 transition-all"
+                    disabled={submitLoading || !zipResult?.upload_token}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2 text-xs sm:text-sm font-mono font-semibold text-slate-950 shadow-lg shadow-emerald-500/40 hover:from-emerald-400 hover:to-emerald-500 transition-all disabled:opacity-50 disabled:pointer-events-none"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    Submit Lab
+                    {submitLoading ? "Submitting…" : isAdmin ? "Publish Lab Now" : "Submit Lab"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {editOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 bg-black/70 backdrop-blur-sm">
+            <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900/95 shadow-2xl shadow-black/60">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+                <h2 className="text-sm sm:text-base font-mono font-semibold text-slate-50">
+                  Edit Lab Metadata (No code/files)
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setEditOpen(false)}
+                  className="p-1 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <form
+                className="px-5 py-4 space-y-4 text-sm text-slate-100 max-h-[75vh] overflow-y-auto"
+                onSubmit={handleSaveEdit}
+              >
+                {editError && (
+                  <div className="rounded-lg border border-rose-700 bg-rose-950/30 p-3 text-xs text-rose-300 font-mono">
+                    {editError}
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-mono text-slate-400 mb-1.5">Lab Title</label>
+                  <input
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400"
+                    value={editForm.title}
+                    onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono text-slate-400 mb-1.5">Description</label>
+                  <textarea
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400 min-h-[90px]"
+                    value={editForm.description}
+                    onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono text-slate-400 mb-1.5">
+                    Lab mode (white box vs black box)
+                  </label>
+                  <select
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400"
+                    value={String(editForm.labtype_id)}
+                    onChange={(e) =>
+                      setEditForm((f) => ({ ...f, labtype_id: Number(e.target.value) || 1 }))
+                    }
+                  >
+                    <option value="1">White box (labtype_id: 1)</option>
+                    <option value="2">Black box (labtype_id: 2)</option>
+                    <option value="3">Broken access / access control (labtype_id: 3)</option>
+                  </select>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-mono text-slate-400 mb-1.5">Difficulty</label>
+                    <select
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400"
+                      value={editForm.difficulty}
+                      onChange={(e) => setEditForm((f) => ({ ...f, difficulty: e.target.value }))}
+                    >
+                      <option value="easy">Easy</option>
+                      <option value="medium">Medium</option>
+                      <option value="hard">Hard</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-slate-400 mb-1.5">Points</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={10000}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400"
+                      value={editForm.points_total}
+                      onChange={(e) => setEditForm((f) => ({ ...f, points_total: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-slate-400 mb-1.5">Visibility</label>
+                    <select
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400"
+                      value={editForm.visibility}
+                      onChange={(e) => setEditForm((f) => ({ ...f, visibility: e.target.value }))}
+                    >
+                      <option value="public">Public</option>
+                      <option value="private">Private</option>
+                      <option value="unlisted">Unlisted</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-slate-400 mb-1.5">Published</label>
+                    <select
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400"
+                      value={editForm.is_published ? "1" : "0"}
+                      onChange={(e) =>
+                        setEditForm((f) => ({ ...f, is_published: e.target.value === "1" }))
+                      }
+                    >
+                      <option value="1">Published</option>
+                      <option value="0">Draft</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-slate-400 mb-1.5">Port</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={65535}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400"
+                      value={editForm.port}
+                      onChange={(e) => setEditForm((f) => ({ ...f, port: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-slate-400 mb-1.5">Launch Path</label>
+                    <input
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400"
+                      value={editForm.launch_path}
+                      onChange={(e) => setEditForm((f) => ({ ...f, launch_path: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-mono text-slate-400 mb-1.5">Hints (one per line)</label>
+                  <textarea
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400 min-h-[70px]"
+                    value={editForm.hints}
+                    onChange={(e) => setEditForm((f) => ({ ...f, hints: e.target.value }))}
+                    placeholder="Hint 1\nHint 2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono text-slate-400 mb-1.5">Solution</label>
+                  <textarea
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400 min-h-[90px]"
+                    value={editForm.solution}
+                    onChange={(e) => setEditForm((f) => ({ ...f, solution: e.target.value }))}
+                    placeholder="Detailed walkthrough of the intended solution."
+                  />
+                </div>
+                <div className="pt-2 flex flex-col sm:flex-row sm:justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditOpen(false)}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-600 bg-slate-900 px-4 py-2 text-xs sm:text-sm font-mono text-slate-200 hover:border-slate-400 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editSaving}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2 text-xs sm:text-sm font-mono font-semibold text-slate-950 shadow-lg shadow-emerald-500/40 hover:from-emerald-400 hover:to-emerald-500 transition-all disabled:opacity-50"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    {editSaving ? "Saving..." : "Save Metadata"}
                   </button>
                 </div>
               </form>
