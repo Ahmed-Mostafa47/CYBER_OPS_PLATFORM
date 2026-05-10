@@ -25,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../../core/db/db_connect.php';
 require_once __DIR__ . '/../../helpers/security/permissions.php';
 require_once __DIR__ . '/../../helpers/security/audit_log.php';
+require_once __DIR__ . '/../../helpers/security/comment_moderation.php';
 
 // Try to load mailer, but don't fail if it's not available
 $GLOBALS['mailerLoaded'] = false;
@@ -250,6 +251,23 @@ function handle_post_request(PdoMysqliShim $conn)
     $user_id = $data['user_id'];
     $requested_role = $data['requested_role'];
     $comment = $data['comment'] ?? '';
+
+    // Moderate comment if provided
+    if (trim($comment) !== '') {
+        $mod = hackme_moderate_comment_text($comment);
+        if ($mod['flagged']) {
+            // Record a strike for offensive content sent to admin
+            hackme_record_comment_moderation_strike($conn, $user_id);
+            
+            http_response_code(422);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Your request comment violates community guidelines and was blocked.',
+                'code' => 'COMMENT_MODERATION_BLOCKED'
+            ]);
+            return;
+        }
+    }
 
     // Get user information
     $user_stmt = $conn->prepare("SELECT username, email, full_name FROM users WHERE user_id = ?");
