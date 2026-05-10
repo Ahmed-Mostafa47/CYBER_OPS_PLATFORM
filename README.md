@@ -31,7 +31,7 @@ This repository contains the Frontend (React), Backend (PHP), and Notification S
 #### Installation Steps
 1.  **Clone the Platform Repository:**
     ```bash
-    git clone https://github.com/Ahmed-Mostafa47/CYBER_OPS_PLATFORM.git
+    git clone https://github.com/Ahmed-Mostafa47/HackMe.git
     cd HackMe
     ```
 2.  **Install Frontend Dependencies:**
@@ -44,20 +44,27 @@ This repository contains the Frontend (React), Backend (PHP), and Notification S
     ```
 4.  **Configure Environment Variables:**
     *   Rename `.env.example` to `.env`.
-    *   Update your Database credentials (`DB_HOST`, `DB_USER`, `DB_PASS`, etc.).
-    *   Update `MAIL_` settings for email verification features.
-5.  **Database Setup:**
-    *   Open phpMyAdmin and create a database named `ctf_platform`.
-    *   Import the SQL schema located at `server/sql/ctf_platform.sql`.
-6.  **Run the Platform:**
-    *   Start **Apache** and **MySQL** in XAMPP.
+    *   Update your Database credentials (`DB_HOST`, `DB_USER`, `DB_PASS`, etc.) with the **Aiven Server** details.
+5.  **Database Connection:**
+    *   **No local database setup is required.** The platform connects directly to the remote database hosted on Aiven.
+    *   Ensure your `.env` contains the correct hostname and port provided by the administrator.
+6.  **Configure Labs Path:**
+    *   Open `server/core/config/labs_config.php`.
+    *   Update the `LABS_BASE_PATH` constant to the absolute path where you cloned the **Labs** repository.
+    *   Example: `define('LABS_BASE_PATH', 'C:\path\to\your\Labs');`
+7.  **Run the Platform:**
     *   Start the React development server:
         ```bash
         npm run dev
         ```
+    *   Start the Identity Server (Required for user authentication in labs):
+        ```bash
+        npm run identity-server
+        ```
     *   *(Optional)* Start the Notification Server:
         ```bash
         cd notification-server
+        npm install
         node server.js
         ```
 
@@ -68,52 +75,105 @@ This repository contains the Frontend (React), Backend (PHP), and Notification S
 The labs are hosted in a separate repository to keep the environment isolated and manageable via Docker.
 
 #### Installation Steps
-1.  **Go to the Labs Repository:**
-    Navigate to [ABDOHAMDA/Labs](https://github.com/ABDOHAMDA/Labs) on GitHub.
-2.  **Clone the Labs Repository:**
+1.  **Clone the Labs Repository:**
     ```bash
     # Move outside the HackMe directory first
     cd ..
     git clone https://github.com/ABDOHAMDA/Labs.git
     cd Labs
     ```
-3.  **Deploy a Lab:**
-    Each lab folder (e.g., `SQL`, `XSS`) contains its own environment. Most labs use Docker for easy setup.
-    *   Navigate to a specific lab:
+2.  **Lab Structure & Deployment:**
+    Each lab folder contains its own environment. Use the following commands to deploy:
+    
+    *   **SQL Labs:** 
         ```bash
-        cd SQL
+        cd SQL && docker compose up -d --build
         ```
-    *   Start the lab environment:
+    *   **XSS Labs:** 
         ```bash
-        docker compose up -d
+        # Reflected XSS
+        cd XSS/reflected-xss-lab && docker compose up -d --build
+        # DOM XSS
+        cd XSS/dom-xss-select-lab && docker compose up -d --build
         ```
-4.  **Solving Labs:**
-    *   Once the lab is running, it will be accessible at a specific port (e.g., `http://localhost:8080`).
-    *   Solve the challenge and get the **Flag**.
-    *   Submit the flag in the **HackMe Platform** (running on `http://localhost:5173`) to earn points!
+    *   **Broken Authentication (BA):** 
+        ```bash
+        # Standard BA
+        cd BA && docker compose up -d --build
+        # Access Control
+        cd BA && docker compose -f docker-compose.access-control.yml up -d --build
+        ```
+    *   **Black Box (Frogger):** 
+        ```bash
+        cd BLACK_BOX/game && docker compose up -d --build
+        ```
+    *   **Games:**
+        ```bash
+        # Hack The Sudoku
+        cd Games/hack-the-sudoku && docker compose up -d --build
+        # War Game
+        cd "Games/War Game" && docker compose up -d --build
+        # Maze Master
+        cd Games/javascript-videogame-the-maze-master && docker compose up -d --build
+        ```
+    
+3.  **Solving Labs:**
+    *   Once the lab is running, it will be accessible at the port specified in `labs_config.php`.
+    *   Solve the **challenge** to earn points!
 
 ---
 
-## 📁 Directory Structure
+## 📁 Project Structure
 
+A comprehensive view of how the platform and labs are organized:
+
+### 🔹 Platform Core (Main Repository)
 ```text
 HackMe/
-├── src/                # React Frontend (UI, Components, Pages)
-├── server/             # PHP Backend (API, Auth, Logic)
-│   ├── api/            # API Endpoints
-│   ├── core/           # Database & Core helpers
-│   └── sql/            # Database migrations
-├── notification-server/# Node.js Socket.IO server
-└── public/             # Static assets (Images, Banners)
+├── src/                    # Frontend (React + Vite)
+│   ├── components/         # Reusable UI components
+│   ├── pages/              # Dashboard, Leaderboard, Lab Interface, etc.
+│   ├── services/           # API communication layer (Axios)
+│   └── context/            # Authentication & Global state management
+├── server/                 # Backend (PHP 8.1+)
+│   ├── api/                # API Routing & Entry points
+│   ├── controllers/        # Request handling logic (Auth, Labs, User, etc.)
+│   ├── core/               # Core Framework
+│   │   ├── config/         # App, DB, and Labs configurations
+│   │   ├── db/             # PDO Database wrapper
+│   │   └── utils/          # Global utilities (Response, JWT, Validation)
+│   ├── helpers/            # Shared helper functions
+│   └── storage/            # Uploads and session logs
+├── notification-server/    # Node.js + Socket.io for real-time notifications
+└── public/                 # Static assets (Banners, Logos)
+```
+
+### 🔹 Labs Repository (Dockerized Environments)
+```text
+Labs/
+├── SQL/                    # SQL Injection Lab [Docker: ./SQL]
+├── XSS/                    # Cross-Site Scripting Labs
+│   ├── dom-xss-select-lab/ # DOM-based XSS [Docker: ./XSS/dom-xss-select-lab]
+│   └── reflected-xss-lab/  # Reflected XSS [Docker: ./XSS/reflected-xss-lab]
+├── BA/                     # Broken Authentication & Access Control [Docker: ./BA]
+│   ├── docker-compose.yml                  # Default BA Lab
+│   └── docker-compose.access-control.yml   # Access Control Lab
+├── CSRF/                   # Cross-Site Request Forgery [Docker: ./CSRF]
+├── Games/                  # Interactive security games
+│   ├── hack-the-sudoku/    # Logic-based puzzle [Docker: ./Games/hack-the-sudoku]
+│   ├── War Game/           # Strategy security game [Docker: ./Games/War Game]
+│   └── javascript-videogame-the-maze-master/ # Maze Master game
+└── BLACK_BOX/              # Advanced Challenge (Frogger Game) [Docker: ./BLACK_BOX/game]
 ```
 
 ---
 
 ## 🛠️ Troubleshooting
 
-*   **API Connection Error:** Ensure the `VITE_API_BASE` in your frontend code (or `.env`) matches your local XAMPP path (e.g., `http://localhost/HackMe/server/api`).
-*   **Database Errors:** Verify that the database name in `.env` matches the one created in phpMyAdmin.
-*   **Lab Not Accessible:** Make sure Docker Desktop is running before executing `docker compose up`.
+*   **API Connection Error:** Ensure the `VITE_API_BASE` in your `.env` matches your local server path.
+*   **Database Errors:** Verify your internet connection and the Aiven credentials in `.env`. Local MySQL setup is not needed.
+*   **Lab Not Accessible:** Ensure Docker Desktop is running and you used the `--build` flag to refresh the container.
+*   **Path Issues:** Double-check the `LABS_BASE_PATH` in `labs_config.php`. It must be an absolute path.
 
 ---
 
