@@ -43,7 +43,7 @@ const diffBadgeClasses = {
 };
 
 const whiteboxRouteLabIds = new Set(WHITEBOX_WORKBENCH_LAB_IDS);
-const noManualSubmitLabIds = new Set([1, 5, 7, 10, 30, 40, 41, 42]);
+// const noManualSubmitLabIds = new Set([1, 5, 7, 10, 30, 40, 41, 42]);
 
 const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
   const navigate = useNavigate();
@@ -133,27 +133,9 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
     Math.floor(maxPoints * (1 - penaltyPercent / 100))
   );
 
-  // Listen for lab solved from Training Labs (postMessage)
-  // Only accept from lab origins (localhost:4001, 4002) to prevent false solves from extensions/other tabs.
-  const labOrigins = [
-    "http://localhost:4000",
-    "http://localhost:4001",
-    "http://localhost:4002",
-    "http://localhost:4003",
-    "http://localhost:4010",
-    "http://localhost:4011",
-    "http://127.0.0.1:4000",
-    "http://127.0.0.1:4001",
-    "http://127.0.0.1:4002",
-    "http://127.0.0.1:4003",
-    "http://127.0.0.1:4010",
-    "http://127.0.0.1:4011",
-    "http://localhost:4012",
-    "http://127.0.0.1:4012",
-  ];
+
   useEffect(() => {
     const handler = (e) => {
-      //if (!labOrigins.includes(e?.origin ?? "")) return;
       const d = e?.data;
       if (!d || d?.type !== "HACKME_LAB_SOLVED") return;
       const msgLabId = d.labId ?? d.lab_id;
