@@ -3,7 +3,7 @@ import { Lock, Eye, EyeOff, Check, AlertCircle, ArrowLeft } from "lucide-react";
 import BinaryRain from "@/features/shared/ui/BinaryRain";
 import axios from "axios";
 
-const API_URL = "http://localhost/HackMe/server/auth/change_password.php";
+const API_URL = "http://localhost/HackMe/server/controllers/auth/change_password.php";
 
 const ChangePasswordPage = ({
   currentUser,
@@ -55,6 +55,9 @@ const ChangePasswordPage = ({
         user_id: currentUser.user_id,
         old_password: oldPassword,
         new_password: newPassword,
+        client_time_utc: new Date().toISOString(),
+        client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
+        client_tz_offset_minutes: new Date().getTimezoneOffset(),
       });
 
       if (data.success) {

@@ -13,6 +13,7 @@ dist
 dist-ssr
 coverage
 *.local
+.env
 server/config/moderation.local.php
 
 # Editor directories and files
@@ -33,5 +34,3 @@ server/config/moderation.local.php
 /cypress/videos/
 /cypress/screenshots/
 
-# Vitest
-__screenshots__/

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   BrowserRouter as Router,
   useNavigate,
   useLocation,
+  Navigate,
 } from "react-router-dom";
 import LoginPage from "./features/auth/pages/LoginPage";
 import RegisterPage from "./features/auth/pages/RegisterPage";
@@ -26,15 +27,20 @@ import SandboxLabApp from "./features/labs/SandboxLabApp";
 import CommentsPage from "./features/network/CommentsPage";
 import ProfilePage from "./features/profile/ProfilePage";
 import AdminDashboardPage from "./features/dashboard/AdminDashboardPage";
+import AuditLogsPage from "./features/dashboard/AuditLogsPage";
+import AttemptLogsPage from "./features/dashboard/AttemptLogsPage";
+import SecurityDashboardPage from "./features/dashboard/SecurityDashboardPage";
 import NotificationsPage from "./features/notifications/NotificationsPage";
 import NotificationContainer from "./components/notifications/NotificationContainer";
 import axios from "axios";
 import { useAuth } from "./hooks/useAuth";
 import { useLabs } from "./hooks/useLabs";
+import { labService } from "./services/labService";
 import "./styles/animations.css";
 import { WHITEBOX_WORKBENCH_LAB_IDS } from "./constants/labs";
+import { fetchHackMeMachineIdentity } from "./utils/hackmeIdentity";
 
-const API_BASE = "http://localhost/HackMe/server/api";
+const API_BASE = "http://localhost/HackMe/server/controllers";
 
 function AppContent() {
   const {
@@ -51,7 +57,6 @@ function AppContent() {
   const location = useLocation();
 
   const [authMode, setAuthMode] = useState("login");
-  const [pendingUser, setPendingUser] = useState(null);
   const [verificationEmail, setVerificationEmail] = useState("");
   const [roleRequestStatus, setRoleRequestStatus] = useState(null);
   const [roleRequestLoading, setRoleRequestLoading] = useState(false);
@@ -59,6 +64,100 @@ function AppContent() {
   const [pendingRoleRequests, setPendingRoleRequests] = useState([]);
   const [adminStats, setAdminStats] = useState(null);
   const [roleRequestAlert, setRoleRequestAlert] = useState(null);
+  const [securityWarningMessage, setSecurityWarningMessage] = useState("");
+  const lastRestrictedAttemptKeyRef = useRef({});
+  const lastUrlTamperAttemptKeyRef = useRef({});
+  const securityWarningTimerRef = useRef(null);
+
+  const buildLabRoute = (lab, fromCategory, labType) => {
+    const id = Number(lab?.lab_id);
+    if (WHITEBOX_WORKBENCH_LAB_IDS.includes(id)) {
+      const q = new URLSearchParams();
+      q.set("labId", String(id));
+      if (fromCategory) q.set("fromCategory", String(fromCategory));
+      if (labType) q.set("labType", String(labType));
+      return `/lab-whitebox?${q.toString()}`;
+    }
+    const q = new URLSearchParams();
+    q.set("labId", String(id));
+    if (fromCategory) q.set("fromCategory", String(fromCategory));
+    if (labType) q.set("labType", String(labType));
+    return `/lab-modern?${q.toString()}`;
+  };
+
+  const markAllowedLabNav = (labId) => {
+    try {
+      sessionStorage.setItem(
+        "hackme_allowed_lab_nav",
+        JSON.stringify({
+          lab_id: Number(labId),
+          ts: Date.now(),
+        })
+      );
+    } catch (_) {}
+  };
+
+  const isAllowedLabNav = (labId) => {
+    try {
+      const raw = sessionStorage.getItem("hackme_allowed_lab_nav");
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      const sameLab = Number(parsed?.lab_id) === Number(labId);
+      const fresh = Number(parsed?.ts || 0) > 0 && Date.now() - Number(parsed.ts) <= 10 * 60 * 1000;
+      return sameLab && fresh;
+    } catch {
+      return false;
+    }
+  };
+
+  const reportUrlTamperAttempt = async (path, reason) => {
+    const uid = currentUser?.user_id ?? currentUser?.id;
+    if (!uid) return false;
+    let localIp = "";
+    try {
+      const identity = await fetchHackMeMachineIdentity();
+      localIp = identity?.local_ipv4 || "";
+    } catch (_) {}
+    const payload = JSON.stringify({
+      user_id: uid,
+      username: currentUser?.username || "",
+      action: "url_tamper_attempt",
+      status: "failed",
+      details: `URL tamper attempt: ${path} | ${reason}`,
+      client_local_ip: localIp,
+      client_time_utc: new Date().toISOString(),
+      client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
+      client_tz_offset_minutes: new Date().getTimezoneOffset(),
+    });
+    try {
+      const res = await fetch(`${API_BASE}/security/audit_event.php`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+        keepalive: true,
+      });
+      const data = await res.json().catch(() => ({}));
+      return {
+        blocked: Boolean(data?.blocked),
+        warning: typeof data?.warning === "string" ? data.warning : "",
+      };
+    } catch (_) {
+      return { blocked: false, warning: "" };
+    }
+  };
+
+  const showSecurityWarning = (message) => {
+    const msg = String(message || "").trim();
+    if (!msg) return;
+    setSecurityWarningMessage(msg);
+    if (securityWarningTimerRef.current) {
+      clearTimeout(securityWarningTimerRef.current);
+    }
+    securityWarningTimerRef.current = setTimeout(() => {
+      setSecurityWarningMessage("");
+      securityWarningTimerRef.current = null;
+    }, 7000);
+  };
 
   useEffect(() => {
     checkExistingSession();
@@ -108,6 +207,15 @@ function AppContent() {
     return () => clearTimeout(timer);
   }, [roleRequestMessage]);
 
+  useEffect(() => {
+    return () => {
+      if (securityWarningTimerRef.current) {
+        clearTimeout(securityWarningTimerRef.current);
+        securityWarningTimerRef.current = null;
+      }
+    };
+  }, []);
+
   // When lab is solved (e.g. SQL lab in new tab), refresh points from DB
   useEffect(() => {
     const handler = async (e) => {
@@ -116,7 +224,7 @@ function AppContent() {
       const uid = currentUser?.user_id ?? currentUser?.id;
       if (!uid) return;
       try {
-        const res = await fetch(`${API_BASE}/get_user_points.php?user_id=${uid}`);
+        const res = await fetch(`${API_BASE}/users/get_user_points.php?user_id=${uid}`);
         const data = await res.json();
         if (data.success && data.total_points != null) {
           updateUserPoints(data.total_points);
@@ -132,7 +240,7 @@ function AppContent() {
     const refetchPoints = async () => {
       if (!currentUser?.user_id || document.visibilityState !== "visible") return;
       try {
-        const res = await fetch(`${API_BASE}/get_user_points.php?user_id=${currentUser.user_id}`);
+        const res = await fetch(`${API_BASE}/users/get_user_points.php?user_id=${currentUser.user_id}`);
         const data = await res.json();
         if (data.success && data.total_points != null) {
           updateUserPoints(data.total_points);
@@ -147,7 +255,7 @@ function AppContent() {
   const handleRegisterStart = async (userData) => {
     try {
       const response = await fetch(
-        "http://localhost/HackMe/server/auth/send_verification.php",
+        "http://localhost/HackMe/server/controllers/auth/send_verification.php",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -160,23 +268,20 @@ function AppContent() {
         alert("✅ Verification code sent to your email.");
         setPendingUser(userData);
         setVerificationEmail(userData.email);
-        sessionStorage.setItem("verificationEmail", userData.email); // حفظ الإيميل مؤقتًا
-        
-        // Store expiration time (5 minutes from now)
-        const expirationTime = Date.now() + (5 * 60 * 1000); // 5 minutes in milliseconds
+        sessionStorage.setItem("verificationEmail", userData.email);
+        const expirationTime = Date.now() + (5 * 60 * 1000);
         localStorage.setItem("verificationCodeExpiresAt", expirationTime.toString());
         
         navigate("/verify");
       } else {
         alert(data.message || "❌ Registration failed.");
       }
-    } catch (error) {
+    } catch (_) {
       alert("⚠️ Error connecting to server.");
     }
   };
 
   const handleVerificationComplete = () => {
-    // Clear expiration time on verification complete
     localStorage.removeItem("verificationCodeExpiresAt");
     navigate("/set-password");
   };
@@ -185,13 +290,8 @@ function AppContent() {
     alert("📧 Verification code re-sent to " + verificationEmail);
   };
 
-  // 🔐 بعد تعيين الباسورد
   const handlePasswordSet = (userData) => {
-    // Password is already set in the database by SetPasswordPage
-    // userData contains the complete user information from the server response
     if (userData && userData.user_id) {
-      // Clear pending user state
-      setPendingUser(null);
       sessionStorage.removeItem("verificationEmail");
       alert("✅ Account created successfully! Please log in with your credentials.");
       navigate("/");
@@ -205,7 +305,6 @@ function AppContent() {
   const handleForgotPassword = () => navigate("/forgot-password");
   const handleBackToLogin = () => navigate("/login");
   const handleChangePassword = () => navigate("/change-password");
-  const handleProfilePasswordReset = () => navigate("/reset-password?mode=profile");
   
   const handleDeleteAccount = async (password) => {
     if (!currentUser?.user_id) {
@@ -215,7 +314,7 @@ function AppContent() {
 
     try {
       const response = await axios.post(
-        "http://localhost/HackMe/server/auth/delete_account.php",
+        "http://localhost/HackMe/server/controllers/users/delete_account.php",
         {
           user_id: currentUser.user_id,
           password: password,
@@ -248,14 +347,42 @@ function AppContent() {
     handleLogin(userData);
     navigate("/home");
   };
-  const handleLogoutWithNavigation = () => {
+  const handleLogoutWithNavigation = async () => {
+    const userId = currentUser?.user_id || currentUser?.id;
+    const username = currentUser?.username || "";
+    if (userId) {
+      let localIp = "";
+      try {
+        const identity = await fetchHackMeMachineIdentity();
+        localIp = identity?.local_ipv4 || "";
+      } catch (_) {}
+      const payload = JSON.stringify({
+        user_id: userId,
+        username,
+        action: "logout",
+        status: "success",
+        details: "User logged out",
+        client_local_ip: localIp,
+        client_time_utc: new Date().toISOString(),
+        client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
+        client_tz_offset_minutes: new Date().getTimezoneOffset(),
+      });
+      try {
+        await fetch(`${API_BASE}/security/audit_event.php`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: payload,
+          keepalive: true,
+        });
+      } catch (_) {}
+    }
     handleLogout();
     navigate("/");
   };
 
   const fetchRoleRequestStatus = async (userId) => {
     try {
-      const { data } = await axios.get(`${API_BASE}/request_role.php`, {
+      const { data } = await axios.get(`${API_BASE}/users/request_role.php`, {
         params: { user_id: userId },
       });
       if (data.success) {
@@ -271,7 +398,7 @@ function AppContent() {
 
   const fetchPendingRoleRequests = async () => {
     try {
-      const { data } = await axios.get(`${API_BASE}/request_role.php`, {
+      const { data } = await axios.get(`${API_BASE}/users/request_role.php`, {
         params: { all: 1 },
       });
       if (data.success) {
@@ -301,10 +428,10 @@ function AppContent() {
     };
     
     console.log("Sending role request:", requestData);
-    console.log("API URL:", `${API_BASE}/request_role.php`);
+    console.log("API URL:", `${API_BASE}/users/request_role.php`);
     
     try {
-      const response = await axios.post(`${API_BASE}/request_role.php`, requestData, {
+      const response = await axios.post(`${API_BASE}/users/request_role.php`, requestData, {
         headers: {
           'Content-Type': 'application/json',
         },
@@ -380,6 +507,132 @@ function AppContent() {
       setAdminStats(null);
     }
   }, [isAdmin]);
+
+  useEffect(() => {
+    const path = location.pathname;
+    const uid = currentUser?.user_id ?? currentUser?.id;
+    if (!isLoggedIn || !uid) {
+      lastUrlTamperAttemptKeyRef.current = {};
+      return;
+    }
+
+    if (path !== "/lab-whitebox" && path !== "/lab-modern") {
+      lastUrlTamperAttemptKeyRef.current = {};
+      return;
+    }
+
+    const params = new URLSearchParams(location.search);
+    const currentLabId = params.get("labId") || "";
+    if (!currentLabId || isAllowedLabNav(currentLabId)) {
+      lastUrlTamperAttemptKeyRef.current = {};
+      return;
+    }
+
+    const key = `${uid}:${path}:${currentLabId}`;
+    const now = Date.now();
+    const lastAt = Number(lastUrlTamperAttemptKeyRef.current[key] || 0);
+    if (now - lastAt < 1500) {
+      return;
+    }
+    lastUrlTamperAttemptKeyRef.current[key] = now;
+
+    navigate("/home", { replace: true });
+    reportUrlTamperAttempt(path, "lab_id_modified").then((result) => {
+      if (result?.warning) {
+        showSecurityWarning(`⚠️ ${result.warning}`);
+      }
+      if (result?.blocked) {
+        handleLogout();
+        navigate("/", { replace: true });
+      }
+    });
+  }, [
+    isLoggedIn,
+    currentUser?.user_id,
+    currentUser?.id,
+    location.pathname,
+    location.search,
+    navigate,
+  ]);
+
+  useEffect(() => {
+    const path = location.pathname;
+    const uid = currentUser?.user_id ?? currentUser?.id;
+    if (!isLoggedIn || !uid) {
+      lastRestrictedAttemptKeyRef.current = {};
+      return;
+    }
+
+    let restrictionMessage = "";
+    if (path === "/instructor-labs" && !isInstructor && !isAdmin) {
+      restrictionMessage = "INSTRUCTOR_PRIVILEGES_REQUIRED";
+    } else if ((path === "/admin" || path === "/admin-labs") && !isAdmin && !isSuperAdmin) {
+      restrictionMessage = "ADMIN_PRIVILEGES_REQUIRED";
+    } else if (
+      (path === "/audit-logs" || path === "/attempt-logs" || path === "/security-dashboard") &&
+      !isSuperAdmin
+    ) {
+      restrictionMessage = "SUPERADMIN_PRIVILEGES_REQUIRED";
+    }
+
+    if (!restrictionMessage) {
+      lastRestrictedAttemptKeyRef.current = {};
+      return;
+    }
+
+    const key = `${uid}:${path}:${restrictionMessage}`;
+    const now = Date.now();
+    const lastAt = Number(lastRestrictedAttemptKeyRef.current[key] || 0);
+    if (now - lastAt < 1500) return;
+    lastRestrictedAttemptKeyRef.current[key] = now;
+
+    navigate("/home", { replace: true });
+
+    (async () => {
+      let localIp = "";
+      try {
+        const identity = await fetchHackMeMachineIdentity();
+        localIp = identity?.local_ipv4 || "";
+      } catch (_) {}
+      const payload = JSON.stringify({
+        user_id: uid,
+        username: currentUser?.username || "",
+        action: "access_restricted",
+        status: "failed",
+        details: `Attempted restricted route: ${path} | ${restrictionMessage}`,
+        client_local_ip: localIp,
+        client_time_utc: new Date().toISOString(),
+        client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
+        client_tz_offset_minutes: new Date().getTimezoneOffset(),
+      });
+      try {
+        const res = await fetch(`${API_BASE}/security/audit_event.php`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: payload,
+          keepalive: true,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (typeof data?.warning === "string" && data.warning.trim() !== "") {
+          showSecurityWarning(`⚠️ ${data.warning}`);
+        }
+        if (data?.blocked) {
+          handleLogout();
+          navigate("/", { replace: true });
+        }
+      } catch (_) {}
+    })();
+  }, [
+    location.pathname,
+    isLoggedIn,
+    isInstructor,
+    isAdmin,
+    isSuperAdmin,
+    currentUser?.user_id,
+    currentUser?.id,
+    currentUser?.username,
+    navigate,
+  ]);
 
   // Special-case: sandbox lab app (isolated, no auth / navbar)
   if (location.pathname === "/lab-sandbox") {
@@ -480,6 +733,9 @@ function AppContent() {
           <TrainingSelectionPage
             setCurrentPage={(p) => navigate(`/${p}`)}
             setSelectedLabType={setSelectedLabType}
+            isAdmin={isAdmin}
+            isInstructor={isInstructor}
+            onAddLab={() => navigate("/instructor-labs")}
           />
         );
       case "/labs": {
@@ -490,38 +746,53 @@ function AppContent() {
         const backToTraining = () => navigate("/training");
 
         if (!labTypeParam) {
-          return (
-            <LabsListModern
-              selectedLabType={selectedLabType}
-              isAdmin={isAdmin}
-              isInstructor={isInstructor}
-              onEditLab={() => {}}
-              onRemoveLab={() => {}}
-              onLabClick={(lab) =>
-                navigate(
-                  WHITEBOX_WORKBENCH_LAB_IDS.includes(Number(lab.lab_id))
-                    ? `/lab-whitebox?labId=${encodeURIComponent(String(lab.lab_id))}`
-                    : `/lab-modern?labId=${lab.lab_id}`
-                )
-              }
-            />
-          );
+          return <Navigate to="/training" replace />;
         }
 
         if (!categoryParam) {
           return (
             <LabsCategoriesPage
               labType={labTypeParam}
-              isAdmin={isAdmin}
-              isInstructor={isInstructor}
               onBack={backToTraining}
-              onAddLab={() => navigate("/instructor-labs")}
               onSelectCategory={(cat) =>
                 navigate(`/labs?labType=${labTypeParam}&category=${cat}`)
               }
+              onOpenLab={(lab, categoryKey) => {
+                markAllowedLabNav(lab?.lab_id);
+                navigate(buildLabRoute(lab, categoryKey, labTypeParam));
+              }}
             />
           );
         }
+
+        const handleRemoveLabFromList = async (lab) => {
+          const userId = Number(currentUser?.user_id || 0);
+          if (!userId) {
+            window.alert("Missing logged-in user id.");
+            return false;
+          }
+          const ok = window.confirm(
+            `Delete "${lab?.title || "this lab"}"? This action cannot be undone.`
+          );
+          if (!ok) return false;
+          try {
+            const res = await labService.deleteLab({
+              userId,
+              labId: Number(lab?.lab_id || 0),
+            });
+
+            if (res?.message === "Deletion request sent to administrators") {
+              window.alert("Your request to delete this lab has been sent to the administrators for review.");
+              return false; // Don't remove from UI
+            }
+
+            window.alert("Lab deleted successfully.");
+            return true; // Remove from UI
+          } catch (err) {
+            window.alert(err?.message || "Failed to delete lab.");
+            return false;
+          }
+        };
 
         return (
           <LabsListModern
@@ -530,22 +801,21 @@ function AppContent() {
             isInstructor={isInstructor}
             labType={labTypeParam}
             category={categoryParam}
-            onEditLab={() => {}}
-            onRemoveLab={() => {}}
+            onRemoveLab={handleRemoveLabFromList}
             onBack={backToCategories}
             onAddLab={() => navigate("/instructor-labs")}
-            onLabClick={(lab) =>
-              navigate(
-                WHITEBOX_WORKBENCH_LAB_IDS.includes(Number(lab.lab_id))
-                  ? `/lab-whitebox?labId=${encodeURIComponent(String(lab.lab_id))}&fromCategory=${encodeURIComponent(categoryParam)}&labType=${encodeURIComponent(labTypeParam)}`
-                  : `/lab-modern?labId=${lab.lab_id}&fromCategory=${categoryParam}&labType=${labTypeParam}`
-              )
-            }
+            onLabClick={(lab) => {
+              markAllowedLabNav(lab?.lab_id);
+              navigate(buildLabRoute(lab, categoryParam, labTypeParam));
+            }}
           />
         );
       }
       case "/lab-whitebox": {
         const wbLabId = params.get("labId") || String(WHITEBOX_WORKBENCH_LAB_IDS[0]);
+        if (!isAllowedLabNav(wbLabId)) {
+          return <HomePage setCurrentPage={(p) => navigate(`/${p}`)} />;
+        }
         return (
           <LabWhiteboxPage
             key={wbLabId}
@@ -553,7 +823,7 @@ function AppContent() {
             onFlagSuccess={async () => {
               if (!currentUser?.user_id) return;
               try {
-                const res = await fetch(`${API_BASE}/get_user_points.php?user_id=${currentUser.user_id}`);
+                const res = await fetch(`${API_BASE}/users/get_user_points.php?user_id=${currentUser.user_id}`);
                 const data = await res.json();
                 if (data.success && data.total_points != null) {
                   updateUserPoints(data.total_points);
@@ -569,7 +839,10 @@ function AppContent() {
         const labBack =
           fromCat && fromType
             ? `/labs?labType=${fromType}&category=${fromCat}`
-            : "/labs";
+            : "/training";
+        if (!isAllowedLabNav(labId)) {
+          return <HomePage setCurrentPage={(p) => navigate(`/${p}`)} />;
+        }
         return (
           <LabDetailsModern
             key={labId}
@@ -579,7 +852,7 @@ function AppContent() {
             onFlagSuccess={async () => {
               if (!currentUser?.user_id) return;
               try {
-                const res = await fetch(`${API_BASE}/get_user_points.php?user_id=${currentUser.user_id}`);
+                const res = await fetch(`${API_BASE}/users/get_user_points.php?user_id=${currentUser.user_id}`);
                 const data = await res.json();
                 if (data.success && data.total_points != null) {
                   updateUserPoints(data.total_points);
@@ -609,48 +882,30 @@ function AppContent() {
           />
         );
       case "/instructor-labs":
-        if (!isInstructor && !isAdmin) {
-          return (
-            <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black pt-32 text-center text-white font-mono">
-              <p className="text-sm text-gray-500">ACCESS_RESTRICTED</p>
-              <h1 className="text-4xl font-bold text-red-400 mt-4">
-                INSTRUCTOR_PRIVILEGES_REQUIRED
-              </h1>
-            </div>
-          );
-        }
-        return <InstructorLabsDashboard />;
+        if (!isInstructor && !isAdmin) return <HomePage setCurrentPage={(p) => navigate(`/${p}`)} />;
+        return <InstructorLabsDashboard isAdmin={isAdmin} />;
       case "/admin":
-        if (!isAdmin && !isSuperAdmin) {
-          return (
-            <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black pt-32 text-center text-white font-mono">
-              <p className="text-sm text-gray-500">ACCESS_RESTRICTED</p>
-              <h1 className="text-4xl font-bold text-red-400 mt-4">
-                ADMIN_PRIVILEGES_REQUIRED
-              </h1>
-            </div>
-          );
-        }
+        if (!isAdmin && !isSuperAdmin) return <HomePage setCurrentPage={(p) => navigate(`/${p}`)} />;
         return (
           <AdminDashboardPage
             pendingRoleRequests={pendingRoleRequests}
             overviewStats={adminStats}
             currentUser={currentUser}
-            onOpenAdminLabs={() => navigate("/admin-labs")}
+            onOpenAdminLabs={() => navigate("/admin-labs#lab-proposals")}
           />
         );
       case "/admin-labs":
-        if (!isAdmin && !isSuperAdmin) {
-          return (
-            <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black pt-32 text-center text-white font-mono">
-              <p className="text-sm text-gray-500">ACCESS_RESTRICTED</p>
-              <h1 className="text-4xl font-bold text-red-400 mt-4">
-                ADMIN_PRIVILEGES_REQUIRED
-              </h1>
-            </div>
-          );
-        }
+        if (!isAdmin && !isSuperAdmin) return <HomePage setCurrentPage={(p) => navigate(`/${p}`)} />;
         return <AdminLabsDashboard />;
+      case "/audit-logs":
+        if (!isSuperAdmin) return <HomePage setCurrentPage={(p) => navigate(`/${p}`)} />;
+        return <AuditLogsPage currentUser={currentUser} />;
+      case "/attempt-logs":
+        if (!isSuperAdmin) return <HomePage setCurrentPage={(p) => navigate(`/${p}`)} />;
+        return <AttemptLogsPage currentUser={currentUser} />;
+      case "/security-dashboard":
+        if (!isSuperAdmin) return <HomePage setCurrentPage={(p) => navigate(`/${p}`)} />;
+        return <SecurityDashboardPage currentUser={currentUser} />;
       case "/reset-password":
         return (
           <ResetPasswordPage
@@ -677,6 +932,17 @@ function AppContent() {
 
   return (
     <div className="min-h-screen">
+      {securityWarningMessage ? (
+        <div className="fixed right-4 top-20 z-[9999] max-w-md rounded-xl border border-amber-400/70 bg-amber-500/15 px-4 py-3 text-amber-100 shadow-2xl backdrop-blur-md">
+          <div className="flex items-start gap-2">
+            <span className="text-lg leading-none">⚠️</span>
+            <div>
+              <p className="font-semibold text-amber-200">Security Warning</p>
+              <p className="text-sm leading-relaxed">{securityWarningMessage.replace(/^⚠️\s*/, "")}</p>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {!isLoggedIn ? (
         renderAuthPage()
       ) : (
@@ -687,6 +953,7 @@ function AppContent() {
             currentPage={location.pathname.replace("/", "") || "home"}
             currentUser={currentUser}
             isAdmin={isAdmin}
+            isSuperAdmin={isSuperAdmin}
           />
           <NotificationContainer 
             userId={currentUser?.user_id || currentUser?.id} 

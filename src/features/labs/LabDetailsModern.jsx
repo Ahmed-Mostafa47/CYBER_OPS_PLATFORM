@@ -18,7 +18,7 @@ import { WHITEBOX_WORKBENCH_LAB_IDS } from "../../constants/labs";
 import { fetchHackMeMachineIdentity } from "../../utils/hackmeIdentity";
 
 // Use relative path when proxy exists (dev), else full URL (production)
-const API_BASE = import.meta.env.DEV ? "/api" : "http://localhost/HackMe/server/api";
+const API_BASE = import.meta.env.DEV ? "/api" : "/HackMe/server/controllers";
 
 /** Stable per-browser secret (real MAC is not exposed to web apps). Bound with token + IP on server. */
 function getOrCreateHackMeDeviceBind() {
@@ -43,7 +43,7 @@ const diffBadgeClasses = {
 };
 
 const whiteboxRouteLabIds = new Set(WHITEBOX_WORKBENCH_LAB_IDS);
-const noManualSubmitLabIds = new Set([1, 5, 7, 10, 30, 40, 41]);
+// const noManualSubmitLabIds = new Set([1, 5, 7, 10, 30, 40, 41, 42]);
 
 const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
   const navigate = useNavigate();
@@ -133,25 +133,9 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
     Math.floor(maxPoints * (1 - penaltyPercent / 100))
   );
 
-  // Listen for lab solved from Training Labs (postMessage)
-  // Only accept from lab origins (localhost:4001, 4002) to prevent false solves from extensions/other tabs.
-  const labOrigins = [
-    "http://localhost:4000",
-    "http://localhost:4001",
-    "http://localhost:4002",
-    "http://localhost:4003",
-    "http://localhost:4010",
-    "http://localhost:4011",
-    "http://127.0.0.1:4000",
-    "http://127.0.0.1:4001",
-    "http://127.0.0.1:4002",
-    "http://127.0.0.1:4003",
-    "http://127.0.0.1:4010",
-    "http://127.0.0.1:4011",
-  ];
+
   useEffect(() => {
     const handler = (e) => {
-      if (!labOrigins.includes(e?.origin ?? "")) return;
       const d = e?.data;
       if (!d || d?.type !== "HACKME_LAB_SOLVED") return;
       const msgLabId = d.labId ?? d.lab_id;
@@ -178,7 +162,7 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
       if (!lab?.lab_id || (!currentUser?.user_id && !currentUser?.id)) return;
       try {
         const uid = currentUser?.user_id ?? currentUser?.id;
-        const url = `${API_BASE}/labs/check_lab_solved.php?lab_id=${lab.lab_id}&user_id=${uid}&scope=standard`;
+        const url = `${API_BASE}/labs/labs_api/check_lab_solved.php?lab_id=${lab.lab_id}&user_id=${uid}&scope=standard`;
         const r = await fetch(url, { cache: "no-store", signal: abort.signal });
         const d = await r.json().catch(() => ({}));
         if (d?.solved) {
@@ -210,7 +194,7 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
   useEffect(() => {
     const uid = currentUser?.user_id ?? currentUser?.id;
     if (!lab?.lab_id || !uid) return;
-    const url = `${API_BASE}/labs/resource_usage.php?lab_id=${lab.lab_id}&user_id=${uid}`;
+    const url = `${API_BASE}/labs/labs_api/resource_usage.php?lab_id=${lab.lab_id}&user_id=${uid}`;
     fetch(url, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
@@ -218,14 +202,14 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
         setHintViewed(Boolean(d?.data?.hint_viewed));
         setSolutionViewed(Boolean(d?.data?.solution_viewed));
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [lab?.lab_id, currentUser?.user_id, currentUser?.id]);
 
   const markResourceViewed = async (resourceType) => {
     const uid = currentUser?.user_id ?? currentUser?.id;
     if (!uid || !lab?.lab_id) return;
     try {
-      await fetch(`${API_BASE}/labs/resource_usage.php`, {
+      await fetch(`${API_BASE}/labs/labs_api/resource_usage.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -235,7 +219,7 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
           viewed: true,
         }),
       });
-    } catch (_) {}
+    } catch (_) { }
   };
 
   const [startLabLoading, setStartLabLoading] = useState(false);
@@ -247,7 +231,12 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
     setFlagLoading(true);
     setFlagResult(null);
     try {
-      const submitUrl = import.meta.env.DEV ? "/api/submit_flag.php" : `${API_BASE}/submit_flag.php`;
+      let localIp = "";
+      try {
+        const identity = await fetchHackMeMachineIdentity();
+        localIp = identity?.local_ipv4 || "";
+      } catch (_) { }
+      const submitUrl = import.meta.env.DEV ? "/api/labs/submit_flag.php" : `${API_BASE}/labs/submit_flag.php`;
       const res = await fetch(submitUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -255,6 +244,10 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
           lab_id: lab.lab_id,
           flag: flagValue.trim(),
           user_id: currentUser?.user_id ?? currentUser?.id ?? 0,
+          client_local_ip: localIp,
+          client_time_utc: new Date().toISOString(),
+          client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
+          client_tz_offset_minutes: new Date().getTimezoneOffset(),
         }),
       });
       const text = await res.text();
@@ -292,11 +285,23 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
     setStartLabLoading(true);
     setStartLabError(null);
     try {
+      const actorUserId = currentUser?.user_id ?? currentUser?.id ?? 0;
+      const actorUsername = currentUser?.username ?? "";
+      const { mac, local_ipv4: localIp } = await fetchHackMeMachineIdentity();
+
       // Start lab container before opening (runs docker-compose up -d)
-      const startRes = await fetch(`${API_BASE}/labs/start_lab_container.php`, {
+      const startRes = await fetch(`${API_BASE}/labs/labs_api/start_lab_container.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lab_id: lab.lab_id }),
+        body: JSON.stringify({
+          lab_id: lab.lab_id,
+          user_id: actorUserId,
+          username: actorUsername,
+          client_local_ip: localIp,
+          client_time_utc: new Date().toISOString(),
+          client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
+          client_tz_offset_minutes: new Date().getTimezoneOffset(),
+        }),
       });
       const startData = await startRes.json().catch(() => ({}));
       // Continue even if container start fails (might already be running)
@@ -305,8 +310,7 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
       }
 
       const deviceBind = getOrCreateHackMeDeviceBind();
-      const { mac, local_ipv4: localIp } = await fetchHackMeMachineIdentity();
-      const res = await fetch(`${API_BASE}/generate_lab_token.php`, {
+      const res = await fetch(`${API_BASE}/labs/generate_lab_token.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -327,11 +331,15 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
       const normalizedPath = launchPath.startsWith("/") ? launchPath : `/${launchPath}`;
       const separator = normalizedPath.includes("?") ? "&" : "?";
       const url =
-        `http://localhost:${port}${normalizedPath}${separator}labId=${lab.lab_id}&token=${encodeURIComponent(data.token)}` +
+        `http://${window.location.hostname}:${port}${normalizedPath}${separator}labId=${lab.lab_id}&token=${encodeURIComponent(data.token)}` +
         `&device_bind=${encodeURIComponent(deviceBind)}` +
         `&mac_address=${encodeURIComponent(mac)}&client_local_ip=${encodeURIComponent(localIp)}`;
-      // Use named window so lab tab keeps window.opener for postMessage to HackMe (lab 5)
-      window.open(url, "hackme_lab_" + lab.lab_id);
+      // Open in a fresh tab each time to avoid stale-window reuse redirects.
+      // Keep opener available for postMessage solve events.
+      const popup = window.open(url, `hackme_lab_${lab.lab_id}_${Date.now()}`);
+      if (!popup) {
+        setStartLabError("Popup blocked by browser. Allow popups for this site and try again.");
+      }
     } catch (err) {
       setStartLabError(err.message || "Network error");
     } finally {
@@ -368,32 +376,68 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
 
   if (whiteboxRouteLabIds.has(Number(labId))) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black flex items-center justify-center">
-        <p className="text-slate-400 font-mono text-sm">Opening white-box workspace…</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black px-4 sm:px-6 lg:px-10 pt-24 pb-16 scroll-pt-24">
+        <div className="max-w-6xl mx-auto flex flex-col items-center justify-center min-h-[40vh] gap-6">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="self-start inline-flex items-center gap-2 text-xs sm:text-sm font-mono text-slate-400 hover:text-emerald-300 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" aria-hidden />
+              BACK_TO_LABS
+            </button>
+          )}
+          <p className="text-slate-400 font-mono text-sm text-center">Opening white-box workspace…</p>
+        </div>
       </div>
     );
   }
 
   if (labLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black flex items-center justify-center">
-        <p className="text-slate-400 font-mono text-sm">Loading lab...</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black px-4 sm:px-6 lg:px-10 pt-24 pb-16 scroll-pt-24">
+        <div className="max-w-6xl mx-auto">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="mb-10 inline-flex items-center gap-2 text-xs sm:text-sm font-mono text-slate-400 hover:text-emerald-300 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" aria-hidden />
+              BACK_TO_LABS
+            </button>
+          )}
+          <div className="flex justify-center py-20">
+            <p className="text-slate-400 font-mono text-sm">Loading lab...</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!lab || labError) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black flex items-center justify-center px-6">
-        <p className="text-rose-300 font-mono text-sm">
-          {labError || "Lab not found."}
-        </p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black px-4 sm:px-6 lg:px-10 pt-24 pb-16 scroll-pt-24">
+        <div className="max-w-6xl mx-auto flex flex-col items-center gap-6 text-center">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="self-start inline-flex items-center gap-2 text-xs sm:text-sm font-mono text-slate-400 hover:text-emerald-300 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" aria-hidden />
+              BACK_TO_LABS
+            </button>
+          )}
+          <p className="text-rose-300 font-mono text-sm max-w-lg">{labError || "Lab not found."}</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black py-12 px-4 sm:px-6 lg:px-10">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black pt-24 pb-16 scroll-pt-24 px-4 sm:px-6 lg:px-10">
       {/* Success toast - slides down from below navbar, then fades out after 3s */}
       {successPopupVisible && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4 animate-slide-down">
@@ -417,10 +461,11 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
           <div className="space-y-4">
             {onBack && (
               <button
+                type="button"
                 onClick={onBack}
-                className="inline-flex items-center gap-2 text-xs sm:text-sm font-mono text-slate-400 hover:text-emerald-300 transition-colors"
+                className="inline-flex items-center gap-2 text-xs sm:text-sm font-mono text-slate-400 hover:text-emerald-300 transition-colors pt-0.5"
               >
-                <ArrowLeft className="w-4 h-4" />
+                <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden />
                 BACK_TO_LABS
               </button>
             )}
@@ -444,7 +489,7 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
                   className={[
                     "inline-flex items-center gap-1 rounded-full border px-3 py-1",
                     diffBadgeClasses[lab.difficulty] ||
-                      "bg-slate-700/40 text-slate-200 border-slate-500/60",
+                    "bg-slate-700/40 text-slate-200 border-slate-500/60",
                   ].join(" ")}
                 >
                   <Flame className="w-3.5 h-3.5" />
@@ -551,66 +596,7 @@ const LabDetailsModern = ({ labId, onBack, currentUser, onFlagSuccess }) => {
               </p>
             </section>
 
-            {/* Objective-based labs (including Frogger/War) do not use manual flag submission. */}
-            {!noManualSubmitLabIds.has(Number(lab.lab_id)) && (
-            <section className="rounded-2xl border border-slate-700 bg-slate-900/70 p-5 shadow-lg shadow-black/40">
-              <h2 className="text-sm font-mono text-slate-300 mb-2 flex items-center gap-2">
-                <Flag className="w-4 h-4 text-amber-400" />
-                // SUBMIT_FLAG
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-400 mb-4">
-                Enter the flag you captured from the lab environment (port {lab.port ?? 4000}).
-              </p>
-              {labSolved ? (
-                <div className="flex items-center gap-2 rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-4 py-3 text-sm font-mono text-emerald-200">
-                  <CheckCircle2 className="w-5 h-5 shrink-0" />
-                  <span>Lab solved. No need to submit again.</span>
-                </div>
-              ) : (currentUser?.user_id || currentUser?.id) ? (
-                <>
-                  <form onSubmit={handleSubmitFlag} className="flex flex-col sm:flex-row gap-3">
-                    <input
-                      type="text"
-                      value={flagValue}
-                      onChange={(e) => setFlagValue(e.target.value)}
-                      placeholder="FLAG{...}"
-                      className="flex-1 rounded-lg bg-slate-900 border border-slate-600 px-4 py-2.5 text-sm font-mono text-slate-100 placeholder-slate-500 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 transition-all"
-                      disabled={flagLoading}
-                    />
-                    <button
-                      type="submit"
-                      disabled={flagLoading || !flagValue.trim()}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-5 py-2.5 text-sm font-mono font-semibold text-slate-950 shadow-lg shadow-amber-500/30 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                    >
-                      <Flag className="w-4 h-4" />
-                      {flagLoading ? "Submitting..." : "Submit Flag"}
-                    </button>
-                  </form>
-                  {flagResult && (
-                    <div
-                      className={`mt-3 flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-mono ${
-                        flagResult.success || flagResult.message?.includes("already solved")
-                          ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-200"
-                          : "border-rose-500/50 bg-rose-500/10 text-rose-200"
-                      }`}
-                    >
-                      {flagResult.success || flagResult.message?.includes("already solved") ? (
-                        <CheckCircle2 className="w-4 h-4 shrink-0" />
-                      ) : (
-                        <XCircle className="w-4 h-4 shrink-0" />
-                      )}
-                      <span>{flagResult.message}</span>
-                      {flagResult.points != null && (
-                        <span className="text-emerald-300">+{flagResult.points} pts</span>
-                      )}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <p className="text-sm text-slate-500 font-mono">Log in to submit flags.</p>
-              )}
-            </section>
-            )}
+
           </div>
 
           <aside className="space-y-4 lg:sticky lg:top-20">

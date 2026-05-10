@@ -15,7 +15,11 @@ import {
 import { labService } from "../../services/labService";
 import { WHITEBOX_SQL_LAB_ID, WHITEBOX_WORKBENCH_LAB_IDS } from "../../constants/labs";
 import { LAB_TYPES } from "../../data/labTypes";
-import { getCategoryFromLabTitle } from "../../utils/labCategories";
+import {
+  getCategoryKeyForLab,
+  normalizeCategoryKey,
+} from "../../utils/labCategories";
+import { getStoredUserId } from "../../utils/storedUser";
 
 const difficultyColors = {
   easy: "bg-emerald-500/10 text-emerald-300 border-emerald-500/40",
@@ -51,6 +55,7 @@ const LabsListModern = ({
     lab_id: 0,
     title: "",
     description: "",
+    labtype_id: 1,
     difficulty: "easy",
     points_total: 0,
     visibility: "public",
@@ -58,6 +63,8 @@ const LabsListModern = ({
     icon: "",
     launch_path: "",
     port: "",
+    hints: "",
+    solution: "",
   });
 
   useEffect(() => {
@@ -91,30 +98,23 @@ const LabsListModern = ({
         if (id === 1) return false;
         if (lab.labtype_id !== 1 && id !== WHITEBOX_SQL_LAB_ID && !WHITEBOX_WORKBENCH_LAB_IDS.includes(id)) return false;
       } else if (labTypeId === 2) {
-        if (id === 40) return true;
-        if (lab.labtype_id !== 2 && lab.labtype_id !== 3) return false;
+        // Game labs (Sudoku, Frogger, Maze Master) may be mis-typed in DB; still treat as black-box.
+        if (id !== 40 && id !== 41 && id !== 42 && lab.labtype_id !== 2 && lab.labtype_id !== 3) return false;
       } else if (labTypeId === 3) {
         if (lab.labtype_id !== 3 && id !== 18 && id !== 19) return false;
       } else if (lab.labtype_id !== labTypeId) return false;
     }
     if (category) {
-      const labCat = getCategoryFromLabTitle(lab.title, lab.lab_id);
-      if (labCat !== category) return false;
+      const labCat = getCategoryKeyForLab(lab);
+      if (labCat !== normalizeCategoryKey(category)) return false;
     }
     return true;
   });
   const canAddLab =
+    !category &&
     (labType === LAB_TYPES.WHITE_BOX || labType === LAB_TYPES.BLACK_BOX) &&
     (isAdmin || isInstructor);
-  const currentUser = (() => {
-    try {
-      const parsed = JSON.parse(localStorage.getItem("currentUser") || "{}");
-      return parsed && typeof parsed === "object" ? parsed : {};
-    } catch {
-      return {};
-    }
-  })();
-  const currentUserId = Number(currentUser?.user_id || currentUser?.id || 0);
+  const currentUserId = getStoredUserId();
 
   const handleOpenLab = (lab) => {
     if (onLabClick) {
@@ -130,13 +130,23 @@ const LabsListModern = ({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black py-16 px-4 sm:px-6 lg:px-10">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black px-4 sm:px-6 lg:px-10 pt-24 pb-16 scroll-pt-24">
       <div className="max-w-7xl mx-auto">
+        {onBack && (
+          <div className="mb-8 pt-1">
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center gap-2 text-sm font-mono text-slate-400 hover:text-emerald-400 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" aria-hidden />
+              BACK TO CATEGORIES
+            </button>
+          </div>
+        )}
         {/* HEADER */}
         <header className="mb-12 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
           <div>
-            <br />
-            <br />
             <p className="text-xs sm:text-sm text-emerald-400 font-mono tracking-[0.2em] uppercase">
               // LABS_SYSTEM
             </p>
@@ -173,16 +183,6 @@ const LabsListModern = ({
             )}
           </div>
         </header>
-
-        {onBack && (
-          <button
-            onClick={onBack}
-            className="inline-flex items-center gap-2 text-sm font-mono text-slate-400 hover:text-emerald-400 transition-colors mb-8"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            BACK TO CATEGORIES
-          </button>
-        )}
 
         {loading ? (
           <div className="flex justify-center py-16">
@@ -254,7 +254,7 @@ const LabsListModern = ({
                 </div>
 
                 <div className="flex items-center gap-1 text-emerald-300 group-hover:translate-x-1 transition-transform">
-                  <span>OPEN_LAB</span>
+                  <span>{lab.coming_soon ? "SOON" : "OPEN_LAB"}</span>
                   <ArrowUpRight className="w-3.5 h-3.5" />
                 </div>
               </div>
@@ -264,13 +264,14 @@ const LabsListModern = ({
                 <div className="mt-4 flex flex-col sm:flex-row sm:justify-end gap-2">
                   <button
                     type="button"
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
                       setEditError("");
                       setEditForm({
                         lab_id: Number(lab.lab_id) || 0,
                         title: String(lab.title || ""),
                         description: String(lab.description || ""),
+                        labtype_id: Number(lab.labtype_id) || 1,
                         difficulty: String(lab.difficulty || "easy"),
                         points_total: Number(lab.points_total || 0),
                         visibility: String(lab.visibility || "public"),
@@ -278,9 +279,28 @@ const LabsListModern = ({
                         icon: String(lab.icon || ""),
                         launch_path: String(lab.launch_path || ""),
                         port: lab.port != null ? String(lab.port) : "",
+                        hints: "",
+                        solution: "",
                       });
                       setEditOpen(true);
                       onEditLab && onEditLab(lab);
+                      if (!currentUserId) return;
+                      setEditSaving(true);
+                      try {
+                        const res = await labService.getLabEditData({ userId: currentUserId, labId: lab.lab_id });
+                        const detailedLab = res?.data?.lab;
+                        if (detailedLab) {
+                          setEditForm((prev) => ({
+                            ...prev,
+                            solution: detailedLab.solution || "",
+                            hints: (detailedLab.hints || []).join("\n"),
+                          }));
+                        }
+                      } catch (err) {
+                        setEditError(err?.message || "Failed to load hints/solution.");
+                      } finally {
+                        setEditSaving(false);
+                      }
                     }}
                     className="inline-flex items-center justify-center gap-1.5 rounded-lg 
                     border border-slate-600 bg-slate-800/80 
@@ -294,18 +314,26 @@ const LabsListModern = ({
 
                   <button
                     type="button"
-                    onClick={(e) => {
+                    disabled={lab.is_deletion_pending && !isAdmin && currentUserId !== 9}
+                    onClick={async (e) => {
                       e.stopPropagation();
-                      onRemoveLab && onRemoveLab(lab);
+                      if (onRemoveLab) {
+                        const removed = await onRemoveLab(lab);
+                        if (removed) {
+                          setLabs((prev) =>
+                            prev.filter((l) => Number(l.lab_id) !== Number(lab.lab_id))
+                          );
+                        }
+                      }
                     }}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-lg 
-                    border border-rose-500/60 bg-rose-500/10 
-                    px-3 py-1.5 text-[11px] font-mono text-rose-200 
-                    hover:bg-rose-500/20 transition-colors 
-                    w-full sm:w-auto"
+                    className={`inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-mono transition-colors w-full sm:w-auto ${
+                      lab.is_deletion_pending && !isAdmin && currentUserId !== 9
+                        ? "border-amber-500/40 bg-amber-500/10 text-amber-300 opacity-70 cursor-not-allowed"
+                        : "border-rose-500/60 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
+                    }`}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    Remove
+                    {lab.is_deletion_pending && !isAdmin && currentUserId !== 9 ? "Deletion Pending" : "Remove"}
                   </button>
                 </div>
               )}
@@ -354,6 +382,9 @@ const LabsListModern = ({
                     icon: editForm.icon,
                     launchPath: editForm.launch_path,
                     port: editForm.port === "" ? null : Number(editForm.port),
+                    labtypeId: editForm.labtype_id,
+                    solution: editForm.solution,
+                    hints: editForm.hints.split("\n").map((h) => h.trim()).filter(Boolean),
                   });
                   const updated = res?.data?.lab;
                   if (updated?.lab_id) {
@@ -393,6 +424,22 @@ const LabsListModern = ({
                   onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
                   required
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-mono text-slate-400 mb-1.5">
+                  Lab mode (white box vs black box)
+                </label>
+                <select
+                  className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400"
+                  value={String(editForm.labtype_id)}
+                  onChange={(e) =>
+                    setEditForm((f) => ({ ...f, labtype_id: Number(e.target.value) || 1 }))
+                  }
+                >
+                  <option value="1">White box (labtype_id: 1)</option>
+                  <option value="2">Black box (labtype_id: 2)</option>
+                  <option value="3">Broken access / access control (labtype_id: 3)</option>
+                </select>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
@@ -451,16 +498,34 @@ const LabsListModern = ({
                     value={editForm.port}
                     onChange={(e) => setEditForm((f) => ({ ...f, port: e.target.value }))}
                   />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-slate-400 mb-1.5">Launch Path</label>
+                    <input
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400"
+                      value={editForm.launch_path}
+                      onChange={(e) => setEditForm((f) => ({ ...f, launch_path: e.target.value }))}
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1.5">Launch Path</label>
-                  <input
-                    className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400"
-                    value={editForm.launch_path}
-                    onChange={(e) => setEditForm((f) => ({ ...f, launch_path: e.target.value }))}
+                  <label className="block text-xs font-mono text-slate-400 mb-1.5">Hints (one per line)</label>
+                  <textarea
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400 min-h-[70px]"
+                    value={editForm.hints}
+                    onChange={(e) => setEditForm((f) => ({ ...f, hints: e.target.value }))}
+                    placeholder="Hint 1\nHint 2"
                   />
                 </div>
-              </div>
+                <div>
+                  <label className="block text-xs font-mono text-slate-400 mb-1.5">Solution</label>
+                  <textarea
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400 min-h-[90px]"
+                    value={editForm.solution}
+                    onChange={(e) => setEditForm((f) => ({ ...f, solution: e.target.value }))}
+                    placeholder="Detailed walkthrough of the intended solution."
+                  />
+                </div>
               <div className="pt-2 flex flex-col sm:flex-row sm:justify-end gap-2">
                 <button
                   type="button"
