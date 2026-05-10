@@ -29,30 +29,34 @@ This repository contains the Frontend (React), Backend (PHP), and Notification S
 *   **Composer** (for PHP dependencies)
 
 #### Installation Steps
-1.  **Clone the Platform Repository:**
+
+1. **Clone the Platform Repository inside XAMPP htdocs**  
+   > The project **must** be placed inside: `C:\xampp\htdocs`
+
+2.  **Clone the Platform Repository:**
     ```bash
     git clone https://github.com/Ahmed-Mostafa47/HackMe.git
     cd HackMe
     ```
-2.  **Install Frontend Dependencies:**
+3.  **Install Frontend Dependencies:**
     ```bash
     npm install
     ```
-3.  **Install PHP Dependencies:**
+4.  **Install PHP Dependencies:**
     ```bash
     composer install
     ```
-4.  **Configure Environment Variables:**
+5.  **Configure Environment Variables:**
     *   Rename `.env.example` to `.env`.
     *   Update your Database credentials (`DB_HOST`, `DB_USER`, `DB_PASS`, etc.) with the **Aiven Server** details.
-5.  **Database Connection:**
+6.  **Database Connection:**
     *   **No local database setup is required.** The platform connects directly to the remote database hosted on Aiven.
     *   Ensure your `.env` contains the correct hostname and port provided by the administrator.
-6.  **Configure Labs Path:**
+7.  **Configure Labs Path:**
     *   Open `server/core/config/labs_config.php`.
     *   Update the `LABS_BASE_PATH` constant to the absolute path where you cloned the **Labs** repository.
     *   Example: `define('LABS_BASE_PATH', 'C:\path\to\your\Labs');`
-7.  **Run the Platform:**
+8.  **Run the Platform:**
     *   Start the React development server:
         ```bash
         npm run dev
