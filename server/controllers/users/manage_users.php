@@ -281,6 +281,14 @@ function handle_post_request(PdoMysqliShim $conn)
             $updateStmt->close();
         }
         
+        // Clear any pending/approved role requests so the UI notification disappears
+        $delReqStmt = $conn->prepare("DELETE FROM role_requests WHERE user_id = ?");
+        if ($delReqStmt) {
+            $delReqStmt->bind_param('i', $targetUserId);
+            $delReqStmt->execute();
+            $delReqStmt->close();
+        }
+        
         hackme_write_audit_log($conn, [
             'actor_user_id' => $currentUserId,
             'actor_username' => $actorName,
@@ -455,6 +463,14 @@ function handle_put_request(PdoMysqliShim $conn)
     $success = removeRole($conn, $targetUserId, $roleName);
     
     if ($success) {
+        // Clear any pending/approved role requests so the UI notification disappears
+        $delReqStmt = $conn->prepare("DELETE FROM role_requests WHERE user_id = ?");
+        if ($delReqStmt) {
+            $delReqStmt->bind_param('i', $targetUserId);
+            $delReqStmt->execute();
+            $delReqStmt->close();
+        }
+
         hackme_write_audit_log($conn, [
             'actor_user_id' => $currentUserId,
             'actor_username' => $actorName,

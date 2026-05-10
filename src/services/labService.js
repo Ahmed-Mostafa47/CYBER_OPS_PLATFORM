@@ -521,6 +521,37 @@ export const labService = {
     }
     return data;
   },
+
+  async getLabDeletionRequests({ userId }) {
+    const response = await fetch(
+      `${getLabsBase()}/labs_api/manage_lab_deletions.php?user_id=${encodeURIComponent(userId)}`,
+      { cache: "no-store" }
+    );
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data?.success === false) {
+      throw new Error(data?.message || `Failed to load lab deletion requests (${response.status})`);
+    }
+    return data;
+  },
+
+  async manageLabDeletion({ userId, requestId, action }) {
+    const clientLocalIp = await getClientLocalIp();
+    const response = await fetch(`${getLabsBase()}/labs_api/manage_lab_deletions.php`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: userId,
+        request_id: requestId,
+        action,
+        client_local_ip: clientLocalIp,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data?.success === false) {
+      throw new Error(data?.message || `Failed to manage deletion request (${response.status})`);
+    }
+    return data;
+  },
 };
 
 export default labService;

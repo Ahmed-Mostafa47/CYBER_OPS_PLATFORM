@@ -50,7 +50,8 @@ const ProfilePage = ({
   const displayPoints = currentUser?.total_points ?? points;
 
   const getStatusBadge = (status) => {
-    if (!status) return null;
+    // If status is empty, or if it's already approved (they have their rank badge anyway)
+    if (!status || status === 'approved') return null;
     const colors = {
       pending: "text-yellow-400 bg-yellow-400/10 border-yellow-400/30",
       approved: "text-green-400 bg-green-400/10 border-green-400/30",

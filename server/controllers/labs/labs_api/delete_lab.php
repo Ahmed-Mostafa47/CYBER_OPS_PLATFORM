@@ -61,14 +61,25 @@ if ($actorRes && $actorRes->num_rows > 0) {
 }
 
 $rolesRes = $conn->query("
-  SELECT 1
+  SELECT LOWER(r.name) as role_name
   FROM user_roles ur
   INNER JOIN roles r ON r.role_id = ur.role_id
   WHERE ur.user_id = $userId
-    AND LOWER(r.name) IN ('admin','superadmin','instructor')
-  LIMIT 1
 ");
-if (!$rolesRes || $rolesRes->num_rows === 0) {
+$isAdmin = false;
+$isInstructor = false;
+if ($rolesRes && $rolesRes->num_rows > 0) {
+    while ($rRow = $rolesRes->fetch_assoc()) {
+        if (in_array($rRow['role_name'], ['admin', 'superadmin'])) {
+            $isAdmin = true;
+        }
+        if ($rRow['role_name'] === 'instructor') {
+            $isInstructor = true;
+        }
+    }
+}
+
+if (!$isAdmin && !$isInstructor) {
     hackme_write_audit_log($conn, [
         'actor_user_id' => $userId,
         'actor_username' => $actorUsername,
@@ -84,6 +95,39 @@ if (!$rolesRes || $rolesRes->num_rows === 0) {
     ]);
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Insufficient permissions']);
+    exit;
+}
+
+if (!$isAdmin && $isInstructor) {
+    // Only instructor: send deletion request instead of deleting
+    $stmt = $conn->prepare("INSERT INTO lab_deletion_requests (lab_id, instructor_id, status) VALUES (?, ?, 'pending')");
+    $stmt->bind_param('ii', $labId, $userId);
+    if ($stmt->execute()) {
+        hackme_write_audit_log($conn, [
+            'actor_user_id' => $userId,
+            'actor_username' => $actorUsername,
+            'action' => 'lab_delete_request',
+            'status' => 'success',
+            'details' => json_encode([
+                'message' => 'Requested lab deletion',
+                'lab_id' => $labId,
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'ip_address' => hackme_client_ip(),
+            'client_local_ip' => $clientLocalIp,
+            'user_agent' => (string) ($_SERVER['HTTP_USER_AGENT'] ?? ''),
+        ]);
+        echo json_encode([
+            'success' => true,
+            'message' => 'Deletion request sent to administrators',
+            'data' => [
+                'lab_id' => $labId,
+                'status' => 'pending'
+            ]
+        ]);
+    } else {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Failed to submit deletion request']);
+    }
     exit;
 }
 
