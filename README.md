@@ -178,6 +178,14 @@ Labs/
 *   **Database Errors:** Verify your internet connection and the Aiven credentials in `.env`. Local MySQL setup is not needed.
 *   **Lab Not Accessible:** Ensure Docker Desktop is running and you used the `--build` flag to refresh the container.
 *   **Path Issues:** Double-check the `LABS_BASE_PATH` in `labs_config.php`. It must be an absolute path.
+*   **Missing PHP Zip Extension:** If you see the error `Server is missing the PHP zip extension (ZipArchive)`, follow these steps:
+    1.  Open the **XAMPP Control Panel**.
+    2.  In the **Apache** row, click the **Config** button.
+    3.  Select **php.ini** from the list.
+    4.  Search (Ctrl + F) for `;extension=zip`.
+    5.  Remove the semicolon (`;`) at the beginning of the line to enable it: `extension=zip`.
+    6.  Save the file and **Restart Apache** from the XAMPP Control Panel.
+    7.  Alternatively, ensure you are using the latest version of PHP.
 
 ---
 
