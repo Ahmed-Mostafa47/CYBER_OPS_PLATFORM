@@ -182,9 +182,9 @@ Labs/
 ---
 
 ## 🎓 Contributors
-*   **Graduation Project Team** - Faculty of Computers Science.
+*   **Graduation Project Team** - Faculty of Computer Science.
 
 ---
 
 ### 🌟 Project Status: Active Development
-For any issues, please open an issue in the respective repository.
+
