@@ -182,7 +182,7 @@ Labs/
 ---
 
 ## 🎓 Contributors
-*   **Graduation Project Team** - Faculty of Computers and Artificial Intelligence.
+*   **Graduation Project Team** - Faculty of Computers Science.
 
 ---
 
