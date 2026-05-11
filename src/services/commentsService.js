@@ -18,7 +18,7 @@ export const createComment = async ({ userId, content, parentId = null }) => {
 };
 
 export const toggleCommentLike = async ({ commentId, userId }) => {
-  const { data } = await apiClient.post("/comments/like.php", {
+  const { data } = await apiClient.post("/social/comments/like/", {
     comment_id: commentId,
     user_id: userId,
   });
